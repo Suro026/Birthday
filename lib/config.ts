@@ -88,16 +88,16 @@ export const siteConfig = {
 
   // Gallery Images
   galleryImages: [
-    "/images/128.jpg",
-    "/images/147.jpg",
-    "/images/226.jpg",
-    "/images/253.jpg",
-    "/images/359.jpg",
-    "/images/510.jpg",
-    "/images/530.jpg",
-    "/images/535.jpg",
-    "/images/536.jpg",
-    "/images/541.jpg"
+    "/us1.jpg",
+    "/us2.jpg",
+    "/us3.jpg",
+    "/us4.jpg",
+    "/us5.jpg",
+    "/us6.jpg",
+    "/us7.jpg",
+    "/us8.jpg",
+    "/us9.jpg",
+    "/us10.jpg"
   ],
 
   // SEO
