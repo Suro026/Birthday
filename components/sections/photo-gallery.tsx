@@ -29,7 +29,7 @@ export function PhotoGallery() {
           </h2>
           <p className="mb-12 text-center text-lg text-gray-700 md:text-xl">{siteConfig.sections.gallery.subtitle}</p>
 
-          <div className="relative mx-auto aspect-[4/3] max-w-4xl overflow-hidden rounded-3xl bg-white shadow-2xl">
+          <div className="relative mx-auto max-w-4xl overflow-hidden rounded-3xl bg-white shadow-2xl">
             <AnimatePresence mode="wait">
               {isLoaded && (
                 <motion.div
@@ -38,17 +38,18 @@ export function PhotoGallery() {
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ duration: 0.7, ease: "easeInOut" }}
-                  className="relative h-full w-full"
+                  className="relative flex items-center justify-center"
                 >
                   <Image
                     src={siteConfig.galleryImages[currentIndex] || "/placeholder.svg"}
                     alt={`Romantic moment ${currentIndex + 1}`}
-                    fill
-                    className="object-cover"
+                    width={800}
+                    height={600}
+                    className="max-h-[70vh] w-auto object-contain"
                     priority={currentIndex === 0}
                     quality={90}
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent pointer-events-none" />
                 </motion.div>
               )}
             </AnimatePresence>
