@@ -117,7 +117,7 @@ export function MusicPlayer() {
 
             <div className="grid gap-0 md:grid-cols-[350px_1fr]">
               {/* Album Art Section */}
-              <div className="relative aspect-square md:aspect-auto">
+              <div className="relative flex items-center justify-center bg-gray-900 min-h-[350px] md:min-h-[400px]">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={currentSongIndex}
@@ -125,17 +125,19 @@ export function MusicPlayer() {
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 1.1 }}
                     transition={{ duration: 0.5 }}
-                    className="relative h-full w-full"
+                    className="relative flex items-center justify-center p-4"
                   >
                     <Image
                       src={currentSong.albumArt || "/placeholder.svg"}
                       alt={currentSong.title}
-                      fill
-                      className="object-cover"
+                      width={0}
+                      height={0}
+                      sizes="(max-width: 768px) 90vw, 350px"
+                      className="w-auto h-auto max-w-full max-h-[320px] md:max-h-[360px] object-contain rounded-lg"
                       priority
                     />
                     {/* Gradient overlay for better text visibility */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none rounded-lg" />
                   </motion.div>
                 </AnimatePresence>
               </div>

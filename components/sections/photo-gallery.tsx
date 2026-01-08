@@ -29,7 +29,7 @@ export function PhotoGallery() {
           </h2>
           <p className="mb-12 text-center text-lg text-gray-700 md:text-xl">{siteConfig.sections.gallery.subtitle}</p>
 
-          <div className="relative mx-auto max-w-4xl overflow-hidden rounded-3xl bg-white shadow-2xl">
+          <div className="relative mx-auto w-full max-w-none flex justify-center">
             <AnimatePresence mode="wait">
               {isLoaded && (
                 <motion.div
@@ -38,31 +38,32 @@ export function PhotoGallery() {
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ duration: 0.7, ease: "easeInOut" }}
-                  className="relative flex items-center justify-center"
+                  className="relative bg-white rounded-3xl shadow-2xl p-4"
                 >
                   <Image
                     src={siteConfig.galleryImages[currentIndex] || "/placeholder.svg"}
                     alt={`Romantic moment ${currentIndex + 1}`}
-                    width={800}
-                    height={600}
-                    className="max-h-[70vh] w-auto object-contain"
+                    width={0}
+                    height={0}
+                    sizes="(max-width: 768px) 90vw, (max-width: 1200px) 80vw, 70vw"
+                    className="w-auto h-auto max-w-[90vw] max-h-[80vh] object-contain rounded-2xl"
                     priority={currentIndex === 0}
                     quality={90}
+                    style={{ width: 'auto', height: 'auto' }}
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent pointer-events-none" />
                 </motion.div>
               )}
             </AnimatePresence>
 
             {/* Progress indicators */}
-            <div className="absolute bottom-6 left-1/2 flex -translate-x-1/2 gap-2">
+            <div className="mt-8 flex justify-center gap-2">
               {siteConfig.galleryImages.map((_, index) => (
                 <motion.div
                   key={index}
-                  className="h-2 w-2 rounded-full bg-white/50 backdrop-blur-sm"
+                  className="h-2 w-2 rounded-full bg-rose-300 backdrop-blur-sm"
                   animate={{
                     scale: currentIndex === index ? 1.5 : 1,
-                    backgroundColor: currentIndex === index ? "rgba(255, 255, 255, 1)" : "rgba(255, 255, 255, 0.5)",
+                    backgroundColor: currentIndex === index ? "rgba(225, 29, 72, 1)" : "rgba(225, 29, 72, 0.5)",
                   }}
                   transition={{ duration: 0.3 }}
                 />
