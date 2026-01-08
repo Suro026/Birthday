@@ -29,7 +29,7 @@ export function PhotoGallery() {
           </h2>
           <p className="mb-12 text-center text-lg text-gray-700 md:text-xl">{siteConfig.sections.gallery.subtitle}</p>
 
-          <div className="relative mx-auto w-full max-w-none flex justify-center">
+          <div className="relative mx-auto w-full flex flex-col items-center">
             <AnimatePresence mode="wait">
               {isLoaded && (
                 <motion.div
@@ -38,7 +38,7 @@ export function PhotoGallery() {
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ duration: 0.7, ease: "easeInOut" }}
-                  className="relative bg-white rounded-3xl shadow-2xl p-4"
+                  className="relative bg-white rounded-3xl shadow-2xl p-4 flex items-center justify-center"
                 >
                   <Image
                     src={siteConfig.galleryImages[currentIndex] || "/placeholder.svg"}
