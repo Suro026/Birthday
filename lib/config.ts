@@ -72,15 +72,15 @@ export const siteConfig = {
       birthdayWish: {
         title: "Happy Birthday, My Love",
         message:
-          "Happiest 20' Birthday 
-Mummum 🤍💗
-Etai amar deoa as a devoloper gift 
-Hya ami bisas korte parchi sei chotto baccha gunda ta etto boro hoye gelo ... 💗🤍🤍🤍💗💗💗
-Happy happy happy happy happy birthday onektaaaaaaaaaaa bhalobasa ... 
-Uuuuummahhhhhhhh ....💗🤍💗🤍💗🤍💗🤍💗🤍💗🤍💗🤍💗🤍💗🤍💗🤍💗🤍💗🤍
-Ami tomake onek bhalobasi ... 
-Tumi amar jibon er sobcheye boro angsho ...
-I LOVE YOU MUMMUM 💗🤍💗🤍💗🤍💗🤍💗🤍💗...🤍💗🤍💗🤍💗🤍💗🤍💗🤍",
+          "Happiest 20' Birthday"
+          "Mummum 🤍💗"
+"Etai amar deoa as a devoloper gift "
+"Hya ami bisas korte parchi sei chotto baccha gunda ta etto boro hoye gelo ... 💗🤍🤍🤍💗💗💗"
+"Happy happy happy happy happy birthday onektaaaaaaaaaaa bhalobasa ... "
+"Uuuuummahhhhhhhh ....💗🤍💗🤍💗🤍💗🤍💗🤍💗🤍💗🤍💗🤍💗🤍💗🤍💗🤍💗🤍"
+"Ami tomake onek bhalobasi ... "
+"Tumi amar jibon er sobcheye boro angsho ..."
+"I LOVE YOU MUMMUM 💗🤍💗🤍💗🤍💗🤍💗🤍💗...🤍💗🤍💗🤍💗🤍💗🤍💗🤍" ,
       },
       neetWish: {
         title: "Your NEET 2026 Journey",
