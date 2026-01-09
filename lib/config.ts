@@ -89,11 +89,11 @@ Tumi amar jibon er sobcheye boro angsho ...
 I LOVE YOU MUMMUM 💖🤍💖🤍💖🤍💖🤍💖🤍💖
 `,
   },
-      },
+   },
       neetWish: {
         title: "Your NEET 2026 Journey",
         message:
-          "I believe in you with every fiber of my being. You have the intelligence, dedication, and perseverance to achieve your dreams of becoming a doctor. Every late night studying, every practice test, every moment of doubt you overcome - they're all steps toward your incredible future. Remember that I'm here supporting you every step of the way. When the journey gets tough, know that your hard work will pay off. You're going to make an amazing doctor, and I can't wait to see you accomplish this dream. Keep pushing forward, my star. Your success is inevitable.",
+          "I know mummum neet hoye jabe kolkata tei hoye jabe tomar amar bisas ache 💗🤍 tumi nijer upor bhorsha hariyo na ... Sob thik hoye jabe sob sob ... Sudhu ei 3 te mash sob kichu theke detach hoye giye neet k diye dao dekhbe ar kono dike takate hobe na ... Uuuuummahhh bhalo hobe sob ... Best of luck 💗",
       },
     },
     countdown: {
