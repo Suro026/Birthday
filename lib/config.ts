@@ -72,7 +72,15 @@ export const siteConfig = {
       birthdayWish: {
         title: "Happy Birthday, My Love",
         message:
-          "On this special day, I want you to know how incredibly blessed I feel to have you in my life. Your smile brightens my darkest days, your laughter is my favorite melody, and your love is my greatest treasure. May this year bring you endless joy, unforgettable moments, and all the dreams your heart desires. You deserve nothing but the absolute best that life has to offer. Happy Birthday, my beautiful soul. I love you more than words can ever express.",
+          "Happiest 20' Birthday 
+Mummum 🤍💗
+Etai amar deoa as a devoloper gift 
+Hya ami bisas korte parchi sei chotto baccha gunda ta etto boro hoye gelo ... 💗🤍🤍🤍💗💗💗
+Happy happy happy happy happy birthday onektaaaaaaaaaaa bhalobasa ... 
+Uuuuummahhhhhhhh ....💗🤍💗🤍💗🤍💗🤍💗🤍💗🤍💗🤍💗🤍💗🤍💗🤍💗🤍💗🤍
+Ami tomake onek bhalobasi ... 
+Tumi amar jibon er sobcheye boro angsho ...
+I LOVE YOU MUMMUM 💗🤍💗🤍💗🤍💗🤍💗🤍💗...🤍💗🤍💗🤍💗🤍💗🤍💗🤍",
       },
       neetWish: {
         title: "Your NEET 2026 Journey",
