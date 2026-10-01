@@ -6,13 +6,20 @@
    Layout of this file
      1. Utilities          small helpers
      2. Configuration      defaults + merge of window.ALBUM_CONFIG
-     3. Page layouts       config entry  ->  page content (one function per layout)
+     3. Page layouts       config entry  ->  page content + its entrance storyboard
      4. Image loading      lazy loading with a graceful "missing photo" plate
      5. Book engine        leaves, page-turn physics, painting (transform/opacity only)
      6. Album controller   single source of truth: current page + events
-     7. Input              keyboard, gestures (touch/pen/mouse), wheel, hot-spots
-     8. Music              optional background track
-     9. Boot               wires everything together
+     7. Motion             entrances, particle fields, pointer parallax, landing settle
+     8. Input              keyboard, gestures (touch/pen/mouse), wheel, hot-spots
+     9. Music              optional background track
+    10. Boot               wires everything together
+
+   Motion (section 7)
+     Entrances are authored per layout in section 3 (fx(el, kind, delay, time))
+     and played by CSS when a page gets `.is-entered`. createSettings() decides
+     how much motion this device gets (phone / tablet / desktop, lite,
+     reduced-motion); the canvas particle fields live in createMotion().
 
    How a page turn works
      Every page is a "leaf" hinged on its left edge. Each leaf has a progress
@@ -29,7 +36,7 @@
      - album.on('change', ({ from, to, direction, source }) => …)
      - album.on('view',   ({ view }) => …)           'gate' | 'album'
      - album.book.leaves[i].p                         live progress of each leaf
-     - <html> class .fine-pointer; CSS variables --mx/--my on <html>
+     - <html data-tier="phone|tablet|desktop" data-lite data-reduced>
      - [data-depth="3"] [data-zoom="1.08"] on any element inside a page to
        give it parallax while that page is turned or revealed.
    ========================================================================== */
@@ -114,6 +121,7 @@
     base: { photos: 'assets/photos/', music: 'assets/music/' },
     pages: [],
     music: { src: '', title: '', volume: 0.6, loop: true },
+    motion: { quality: 'auto' },
     ui: {
       previous: 'Previous', next: 'Next', close: 'Close album',
       soundOff: 'Turn sound off', soundOn: 'Turn sound on',
@@ -142,6 +150,44 @@
   }
 
   /* ------------------------------------------------------------------------
+     2b. Motion settings
+         One object describes how much motion this device should get. Phones get
+         a lighter treatment (less parallax, fewer particles, less blur, shorter
+         travel), tablets a little more, desktops the full one. Reduced-motion
+         replaces movement with simple fades. CSS reads the same tiers through
+         media queries; JS reads this object. It updates live when the window
+         or the OS preference changes.
+     ------------------------------------------------------------------------ */
+  function createSettings(cfg) {
+    const mq = {
+      reduced: window.matchMedia('(prefers-reduced-motion: reduce)'),
+      tablet: window.matchMedia('(min-width: 768px)'),
+      desktop: window.matchMedia('(min-width: 1024px) and (hover: hover) and (pointer: fine)'),
+    };
+    const quality = String(cfg.motion.quality || 'auto').toLowerCase(); // auto | full | lite | off
+    const weak = (navigator.hardwareConcurrency || 8) <= 4 || (navigator.deviceMemory || 8) <= 2;
+    const subs = [];
+    const fxs = { reduced: false, lite: false, tier: 'phone', parallax: 1, dust: 0, onChange: (fn) => subs.push(fn) };
+
+    function update() {
+      fxs.reduced = quality === 'off' || mq.reduced.matches;
+      fxs.lite = quality === 'lite' || (quality === 'auto' && weak);
+      fxs.tier = mq.desktop.matches ? 'desktop' : mq.tablet.matches ? 'tablet' : 'phone';
+      const k = fxs.lite ? 0.65 : 1;
+      fxs.parallax = fxs.reduced ? 0 : { phone: 0.5, tablet: 0.8, desktop: 1 }[fxs.tier] * k;
+      fxs.dust = fxs.reduced ? 0 : Math.round({ phone: 9, tablet: 16, desktop: 28 }[fxs.tier] * k);
+      const root = document.documentElement;
+      root.dataset.tier = fxs.tier;
+      root.toggleAttribute('data-lite', fxs.lite);
+      root.toggleAttribute('data-reduced', fxs.reduced);
+      subs.forEach((fn) => fn(fxs));
+    }
+    Object.values(mq).forEach((m) => m.addEventListener('change', update));
+    update();
+    return fxs;
+  }
+
+  /* ------------------------------------------------------------------------
      3. Page layouts
         Each layout function takes (spec, ctx) and returns
           { layout, tone, label, imgs, el }
@@ -149,8 +195,36 @@
         ctx = { cfg, no (1-based page number), photo() -> next photo number }.
         Compositions are sized with container-query units in style.css, so the
         same markup scales from a 320px phone to a desktop.
+
+        Motion is authored here as data, not code: fx(el, kind, delay, time)
+        tags an element for the entrance choreography (see "Motion" in
+        style.css). Delays are in ms from the moment the page is revealed, so
+        each layout reads like a small storyboard.
      ------------------------------------------------------------------------ */
   const text = (tag, cls, value) => (value ? h(tag, { class: cls, text: value }) : null);
+
+  /** Tag an element for the entrance choreography. kinds: rise | fade | drop | draw | words */
+  function fx(el, kind, delay = 0, time = 0) {
+    if (!el) return el;
+    el.dataset.fx = kind;
+    if (delay) el.style.setProperty('--d', `${delay}ms`);
+    if (time) el.style.setProperty('--t', `${time}ms`);
+    return el;
+  }
+
+  /** A heading whose words rise one after another out of a mask. */
+  function words(tag, cls, value, delay = 0, time = 1200) {
+    if (!value) return null;
+    const el = h(tag, { class: cls });
+    const list = String(value).split(/\s+/);
+    list.forEach((word, i) => {
+      const mask = h('span', { class: 'mw' }, [h('span', { class: 'mw__in', text: word })]);
+      mask.style.setProperty('--wi', String(i));
+      el.append(mask);
+      if (i < list.length - 1) el.append(' ');
+    });
+    return fx(el, 'words', delay, time);
+  }
 
   /** Normalise `photo` / `photos` into an array of exactly `count` photo specs. */
   function photosOf(spec, count) {
@@ -160,26 +234,47 @@
     return list.slice(0, count);
   }
 
-  /** A framed photograph. Returns { el, img }. */
-  function photoFigure(photo, ctx, modifier = '') {
+  /**
+   * A framed photograph. Returns { el, img }.
+   *   opts.kind    entrance of the whole frame: 'rise' | 'drop' | 'fade' | ''
+   *   opts.reveal  how the picture itself is uncovered: 'up' | 'left' | 'fade'
+   *   opts.delay / opts.time   storyboard timing (ms)
+   *   opts.depth   parallax strength while the page turns (% of image width)
+   *   opts.pointer desktop pointer parallax in px (0 = none)
+   *   opts.sway    gentle idle rotation (a print resting loosely on the page)
+   */
+  function photoFigure(photo, ctx, modifier = '', opts = {}) {
+    const { kind = '', reveal = 'fade', delay = 0, time = 1500, depth = 3, pointer = 0, sway = false } = opts;
     const n = ctx.photo();
     const img = h('img', {
       class: 'photo__img',
       alt: photo.alt || photo.caption || '',
       decoding: 'async',
       draggable: 'false',
-      dataset: { src: resolveAsset(photo.photo, ctx.cfg.base.photos), depth: '3', zoom: '1.08' },
+      dataset: { src: resolveAsset(photo.photo, ctx.cfg.base.photos), depth: String(depth), zoom: '1.08' },
     });
     if (photo.focus) img.style.objectPosition = photo.focus;
-    const el = h('figure', { class: `photo ${modifier}`.trim(), dataset: { tone: String(n % 3) } }, [
-      h('div', { class: 'photo__well' }, [
-        img,
-        h('div', { class: 'photo__missing', 'aria-hidden': 'true' }, [
-          h('span', { text: ctx.cfg.ui.photograph }),
-          h('span', { text: pad2(n) }),
-        ]),
+    const stage = h('div', { class: 'photo__reveal' }, [
+      img,
+      h('div', { class: 'photo__missing', 'aria-hidden': 'true' }, [
+        h('span', { text: ctx.cfg.ui.photograph }),
+        h('span', { text: pad2(n) }),
       ]),
     ]);
+    if (pointer) stage.dataset.pointer = String(pointer);
+    const el = h('figure', {
+      class: `photo ${modifier}`.trim(),
+      dataset: { tone: String(n % 3), reveal, sway: sway ? '' : null },
+    }, [
+      h('div', { class: 'photo__well' }, [
+        stage,
+        h('span', { class: 'photo__sheen', 'aria-hidden': 'true' }),
+        h('span', { class: 'photo__veil', 'aria-hidden': 'true' }),
+      ]),
+    ]);
+    el.style.setProperty('--d', `${delay}ms`);
+    el.style.setProperty('--t', `${time}ms`);
+    if (kind) el.dataset.fx = kind;
     return { el, img };
   }
 
@@ -193,155 +288,211 @@
     return { layout, tone, imgs, el, label: spec.title || spec.heading || spec.caption || spec.numeral || '' };
   }
 
+  /** A hand-drawn botanical sprig; its strokes draw themselves on. */
+  function sprig() {
+    const NS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 60 130');
+    svg.setAttribute('class', 'sprig');
+    svg.setAttribute('aria-hidden', 'true');
+    [
+      'M30 128 C27 96 34 62 30 8',
+      'M29 98 C13 94 7 80 9 70 C22 72 28 84 29 98',
+      'M31 84 C47 80 53 66 51 56 C38 58 32 70 31 84',
+      'M29.5 66 C16 62 11 50 13 41 C24 43 29 54 29.5 66',
+      'M30.5 52 C43 48 48 37 46 29 C36 31 31 40 30.5 52',
+      'M30 34 C21 30 18 22 19 15 C27 17 30 25 30 34',
+    ].forEach((d, i) => {
+      const path = document.createElementNS(NS, 'path');
+      path.setAttribute('d', d);
+      path.setAttribute('pathLength', '1');
+      path.style.setProperty('--pi', String(i));
+      svg.append(path);
+    });
+    return svg;
+  }
+
   const LAYOUTS = {
-    /* Cover plate: name in the middle, framed by a gold keyline. */
+    /* Cover plate. The keyline settles in, the name rises from a mask, then the
+       rest follows — slow, with gold dust drifting in the light. */
     title(spec, ctx) {
       const { cfg } = ctx;
       const date = spec.showDate === false ? '' : formatDate(cfg.birthday.date, cfg.site.language);
       const el = h('div', { class: 'page page--title' }, [
-        text('p', 'eyebrow', spec.eyebrow),
+        fx(text('p', 'eyebrow', spec.eyebrow), 'fade', 700, 1400),
         h('div', { class: 'title__mid' }, [
-          text('h2', 'title__name', cfg.recipient.name),
-          h('span', { class: 'rule', 'aria-hidden': 'true' }),
-          text('p', 'title__subtitle', spec.subtitle),
+          words('h2', 'title__name', cfg.recipient.name, 1000, 1700),
+          fx(h('span', { class: 'rule', 'aria-hidden': 'true' }), 'draw', 1900, 1200),
+          fx(text('p', 'title__subtitle', spec.subtitle), 'rise', 2200, 1500),
         ]),
-        text('p', 'eyebrow eyebrow--quiet', date),
+        fx(text('p', 'eyebrow eyebrow--quiet', date), 'fade', 3000, 1600),
       ]);
       return { ...result('title', { title: cfg.recipient.name }, el), imgs: [] };
     },
 
-    /* Photograph to the edges, caption on a paper strip beneath. */
+    /* Photograph to the edges: a slow curtain lifts off the picture while it
+       settles from a long, gentle zoom; light crosses it once. */
     full(spec, ctx) {
       const [p] = photosOf(spec, 1);
-      const fig = photoFigure({ ...p, caption: spec.caption }, ctx, 'photo--bleed');
+      const fig = photoFigure({ ...p, caption: spec.caption }, ctx, 'photo--bleed',
+        { reveal: 'up', time: 2600, depth: 4, pointer: 9 });
       const el = h('div', { class: 'page page--full' }, [
         fig.el,
         h('div', { class: 'full__text' }, [
-          metaLine(ctx, spec.date),
-          text('h2', 'page__title', spec.title),
-          text('p', 'page__caption', spec.caption),
+          fx(metaLine(ctx, spec.date), 'fade', 1500, 1200),
+          words('h2', 'page__title', spec.title, 1700, 1300),
+          fx(text('p', 'page__caption', spec.caption), 'rise', 2100, 1400),
         ]),
       ]);
       return result('full', spec, el, [fig.img]);
     },
 
-    /* One photograph in a generous mat, caption centred beneath. */
+    /* One large print. It arrives softly, then drifts; the picture moves a
+       little against its mat as the page turns and (on desktop) with the pointer. */
     single(spec, ctx) {
       const [p] = photosOf(spec, 1);
-      const fig = photoFigure({ ...p, caption: spec.caption }, ctx, 'photo--mat');
+      const fig = photoFigure({ ...p, caption: spec.caption }, ctx, 'photo--mat',
+        { kind: 'fade', reveal: 'fade', time: 1900, depth: 5, pointer: 12 });
       const el = h('div', { class: 'page page--single' }, [
-        metaLine(ctx, spec.date),
+        fx(metaLine(ctx, spec.date), 'fade', 200, 1100),
         fig.el,
         h('div', { class: 'single__text' }, [
-          text('h2', 'page__title', spec.title),
-          text('p', 'page__caption', spec.caption),
+          words('h2', 'page__title', spec.title, 1100, 1200),
+          fx(text('p', 'page__caption', spec.caption), 'rise', 1500, 1300),
         ]),
       ]);
       return result('single', spec, el, [fig.img]);
     },
 
-    /* A large print with a smaller one overlapping it. */
+    /* Collage: the large print is laid down, then the small one lands on it. */
     duo(spec, ctx) {
       const [a, b] = photosOf(spec, 2);
-      const fa = photoFigure(a, ctx, 'photo--mat duo__a');
-      const fb = photoFigure(b, ctx, 'photo--mat duo__b');
+      const fa = photoFigure(a, ctx, 'photo--mat duo__a', { kind: 'drop', reveal: 'fade', delay: 0, time: 1500, depth: 3 });
+      const fb = photoFigure(b, ctx, 'photo--mat duo__b', { kind: 'drop', reveal: 'fade', delay: 650, time: 1300, depth: 7, sway: true });
+      fa.el.style.setProperty('--fx-r', '-2.5deg');
+      fb.el.style.setProperty('--fx-r', '5deg');
+      fb.el.style.setProperty('--fx-x', '22px');
       const el = h('div', { class: 'page page--duo' }, [
         fa.el,
         fb.el,
         h('div', { class: 'duo__text' }, [
-          metaLine(ctx, spec.date),
-          text('h2', 'page__title', spec.title),
-          text('p', 'page__caption', spec.caption),
+          fx(metaLine(ctx, spec.date), 'fade', 1500, 1100),
+          words('h2', 'page__title', spec.title, 1650, 1200),
+          fx(text('p', 'page__caption', spec.caption), 'rise', 2000, 1300),
         ]),
       ]);
       return result('duo', spec, el, [fa.img, fb.img]);
     },
 
-    /* Three tilted prints held by black photo corners. */
+    /* Prints are placed one at a time; each corner snaps on a beat later. */
     corners(spec, ctx) {
-      const prints = photosOf(spec, 3).map((p, i) => photoFigure(p, ctx, `photo--print print--${i + 1}`));
+      const timing = [0, 520, 1040];
+      const tilt = ['-3deg', '4deg', '-2deg'];
+      const prints = photosOf(spec, 3).map((p, i) => {
+        const f = photoFigure(p, ctx, `photo--print print--${i + 1}`,
+          { kind: 'drop', reveal: 'fade', delay: timing[i], time: 1300, depth: [3, 6, 4][i], sway: true });
+        f.el.style.setProperty('--fx-r', tilt[i]);
+        f.el.style.setProperty('--sway-delay', `${i * 1.3}s`);
+        return f;
+      });
       const el = h('div', { class: 'page page--corners' }, [
         ...prints.map((f) => f.el),
-        h('div', { class: 'corners__text' }, [metaLine(ctx, spec.date), text('h2', 'page__title', spec.title)]),
+        h('div', { class: 'corners__text' }, [
+          fx(metaLine(ctx, spec.date), 'fade', 1700, 1100),
+          words('h2', 'page__title', spec.title, 1850, 1200),
+        ]),
       ]);
       return result('corners', spec, el, prints.map((f) => f.img));
     },
 
-    /* A contact sheet: three small frames, each with its own date and caption. */
+    /* A timeline: a gold line grows down the page and each frame, with its
+       date and caption, is set against it in turn. */
     strip(spec, ctx) {
-      const rows = photosOf(spec, 3).map((p) => {
-        const fig = photoFigure(p, ctx, 'photo--frame');
+      const rows = photosOf(spec, 3).map((p, i) => {
+        const fig = photoFigure(p, ctx, 'photo--frame', { reveal: 'left', time: 1300, delay: 160, depth: 4 });
         const row = h('div', { class: 'strip__row' }, [
+          fx(h('span', { class: 'strip__node', 'aria-hidden': 'true' }), 'draw-dot', 0, 700),
           fig.el,
           h('div', { class: 'strip__text' }, [
-            p.date ? h('p', { class: 'eyebrow', text: formatDate(p.date, ctx.cfg.site.language) }) : null,
-            text('p', 'page__caption', p.caption),
+            p.date ? fx(h('p', { class: 'eyebrow', text: formatDate(p.date, ctx.cfg.site.language) }), 'fade', 420, 1000) : null,
+            fx(text('p', 'page__caption', p.caption), 'rise', 560, 1200),
           ]),
         ]);
+        row.style.setProperty('--rd', `${900 + i * 900}ms`);
         return { row, img: fig.img };
       });
       const el = h('div', { class: 'page page--strip' }, [
-        h('div', { class: 'strip__head' }, [metaLine(ctx), text('h2', 'strip__heading', spec.heading)]),
-        ...rows.map((r) => r.row),
+        h('div', { class: 'strip__head' }, [
+          fx(metaLine(ctx), 'fade', 100, 1000),
+          words('h2', 'strip__heading', spec.heading, 250, 1200),
+        ]),
+        h('div', { class: 'strip__rows' }, [
+          fx(h('span', { class: 'strip__line', 'aria-hidden': 'true' }), 'draw-line', 700, 3000),
+          ...rows.map((r) => r.row),
+        ]),
       ]);
       return result('strip', spec, el, rows.map((r) => r.img));
     },
 
-    /* One large photograph and two companions. */
+    /* The large photograph first, then the small memories one by one. */
     mosaic(spec, ctx) {
       const [a, b, c] = photosOf(spec, 3);
-      const fa = photoFigure(a, ctx, 'photo--frame mosaic__a');
-      const fb = photoFigure(b, ctx, 'photo--frame mosaic__b');
-      const fc = photoFigure(c, ctx, 'photo--frame mosaic__c');
+      const fa = photoFigure(a, ctx, 'photo--frame mosaic__a', { reveal: 'up', time: 1700, depth: 4, pointer: 7 });
+      const fb = photoFigure(b, ctx, 'photo--frame mosaic__b', { kind: 'rise', reveal: 'left', delay: 800, time: 1200, depth: 6 });
+      const fc = photoFigure(c, ctx, 'photo--frame mosaic__c', { kind: 'rise', reveal: 'left', delay: 1350, time: 1200, depth: 6 });
       const el = h('div', { class: 'page page--mosaic' }, [
         fa.el, fb.el, fc.el,
         h('div', { class: 'mosaic__text' }, [
-          metaLine(ctx, spec.date),
-          text('h2', 'page__title', spec.title),
-          text('p', 'page__caption', spec.caption),
+          fx(metaLine(ctx, spec.date), 'fade', 1900, 1100),
+          words('h2', 'page__title', spec.title, 2050, 1200),
+          fx(text('p', 'page__caption', spec.caption), 'rise', 2300, 1300),
         ]),
       ]);
       return result('mosaic', spec, el, [fa.img, fb.img, fc.img]);
     },
 
-    /* Wine-coloured divider page. */
+    /* Wine divider: numeral, rule, title and caption arrive in sequence. */
     chapter(spec, ctx) {
       const el = h('div', { class: 'page page--chapter' }, [
-        text('p', 'chapter__numeral', spec.numeral),
+        fx(text('p', 'chapter__numeral', spec.numeral), 'rise', 300, 1800),
         h('div', { class: 'chapter__text' }, [
-          text('h2', 'chapter__title', spec.title),
-          h('span', { class: 'rule', 'aria-hidden': 'true' }),
-          text('p', 'chapter__caption', spec.caption),
+          fx(h('span', { class: 'rule', 'aria-hidden': 'true' }), 'draw', 1300, 1200),
+          words('h2', 'chapter__title', spec.title, 1600, 1400),
+          fx(text('p', 'chapter__caption', spec.caption), 'rise', 2300, 1500),
         ]),
       ]);
       return result('chapter', spec, el, [], 'wine');
     },
 
-    /* The written message. */
+    /* The written message. Paragraphs arrive one at a time; the signature is
+       written on; a sprig draws itself. Tap the page for a small surprise. */
     note(spec, ctx) {
+      const paragraphs = [].concat(spec.paragraphs || []).filter(Boolean);
       const el = h('div', { class: 'page page--note' }, [
-        text('p', 'eyebrow', spec.heading),
-        h('div', { class: 'note__body' }, [].concat(spec.paragraphs || []).filter(Boolean).map(
-          (p) => h('p', { class: 'note__p', text: p }),
+        fx(text('p', 'eyebrow', spec.heading), 'fade', 200, 1100),
+        h('div', { class: 'note__body' }, paragraphs.map(
+          (p, i) => fx(h('p', { class: 'note__p', text: p }), 'rise', 600 + i * 1000, 1500),
         )),
         h('div', { class: 'note__sign' }, [
-          text('p', 'note__signoff', spec.signoff),
-          text('p', 'note__signature', spec.signature),
+          fx(text('p', 'note__signoff', spec.signoff), 'fade', 600 + paragraphs.length * 1000, 1200),
+          h('p', { class: 'note__signature', 'data-fx': 'wipe', style: `--d:${900 + paragraphs.length * 1000}ms;--t:1700ms`, text: spec.signature || '' }),
+          fx(h('span', { class: 'note__spark', 'aria-hidden': 'true' }), 'fade', 3600 + paragraphs.length * 600, 1200),
         ]),
+        h('div', { class: 'note__sprig', style: '--d:500ms', 'aria-hidden': 'true' }, [sprig()]),
       ]);
       return result('note', spec, el);
     },
 
-    /* Last page. */
+    /* Last page: the slowest, quietest arrival in the book. */
     closing(spec, ctx) {
       const el = h('div', { class: 'page page--closing' }, [
-        text('h2', 'closing__heading', spec.heading),
-        h('span', { class: 'rule', 'aria-hidden': 'true' }),
-        text('p', 'closing__text', spec.text),
+        words('h2', 'closing__heading', spec.heading, 1700, 2400),
+        fx(h('span', { class: 'rule', 'aria-hidden': 'true' }), 'draw', 3600, 2000),
+        fx(text('p', 'closing__text', spec.text), 'rise', 4200, 2200),
         spec.restartLabel
-          ? h('button', { class: 'btn btn--onwine', type: 'button', dataset: { action: 'restart' } }, [
+          ? fx(h('button', { class: 'btn btn--onwine', type: 'button', dataset: { action: 'restart' } }, [
               h('span', { text: spec.restartLabel }),
-            ])
+            ]), 'fade', 6000, 2000)
           : null,
       ]);
       return result('closing', spec, el, [], 'wine-deep');
@@ -400,9 +551,8 @@
   const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
   const easeOut = (t) => 1 - Math.pow(1 - t, 3);
 
-  function createBook(pages, dom) {
+  function createBook(pages, dom, fxs, hooks) {
     const total = pages.length;
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
     let index = 0;
     let peek = null; // 'next' | 'prev' | null
     let raf = 0;
@@ -429,6 +579,7 @@
         held: false,     // true while a finger/mouse is dragging this leaf
         live: false,     // visible and promoted to its own compositor layer
         fade: 1,
+        entered: false,  // its entrance choreography has started
       };
     });
 
@@ -436,9 +587,10 @@
     function paintParallax(i) {
       const L = leaves[i];
       if (!L.par.length) return;
+      const k = fxs.parallax;
       const revealed = i === 0 ? 1 : leaves[i - 1].p; // how far the page above has lifted
       for (const item of L.par) {
-        const x = item.depth * ((1 - revealed) - L.p);
+        const x = item.depth * k * ((1 - revealed) - L.p);
         item.el.style.transform = `translate3d(${x.toFixed(2)}%,0,0) scale(${item.zoom})`;
       }
     }
@@ -446,17 +598,23 @@
     function paint(i) {
       const L = leaves[i];
       const { p } = L;
-      const lift = Math.sin(Math.PI * p);
-      L.el.style.transform = `rotateY(${(-p * MAX_ANGLE).toFixed(2)}deg) rotateX(${(lift * 1.3).toFixed(2)}deg)`;
-      const fade = p > FADE_FROM ? clamp(1 - (p - FADE_FROM) / FADE_SPAN, 0, 1) : 1;
-      if (fade !== L.fade) { L.fade = fade; L.el.style.opacity = String(fade); }
-      L.shade.style.opacity = (Math.min(1, p * 1.1) * 0.8).toFixed(3);
-      paintParallax(i);
-      const below = leaves[i + 1];
-      if (below) {
-        below.cast.style.opacity = (lift * 0.9).toFixed(3);
-        paintParallax(i + 1);
+      let fade;
+      if (fxs.reduced) {
+        // Reduced motion: no rotation, shade or shadow — the pages simply cross-fade.
+        L.el.style.transform = 'none';
+        fade = 1 - p;
+        L.shade.style.opacity = '0';
+        if (leaves[i + 1]) leaves[i + 1].cast.style.opacity = '0';
+      } else {
+        const lift = Math.sin(Math.PI * p);
+        L.el.style.transform = `rotateY(${(-p * MAX_ANGLE).toFixed(2)}deg) rotateX(${(lift * 1.3).toFixed(2)}deg)`;
+        fade = p > FADE_FROM ? clamp(1 - (p - FADE_FROM) / FADE_SPAN, 0, 1) : 1;
+        L.shade.style.opacity = (Math.min(1, p * 1.1) * 0.8).toFixed(3);
+        if (leaves[i + 1]) leaves[i + 1].cast.style.opacity = (lift * 0.9).toFixed(3);
       }
+      if (fade !== L.fade) { L.fade = fade; L.el.style.opacity = String(fade); }
+      paintParallax(i);
+      if (leaves[i + 1]) paintParallax(i + 1);
     }
 
     /**
@@ -472,9 +630,21 @@
         live.add(j);
         if (leaves[j].p <= 0.001 && !leaves[j].held) break;
       }
+      const canEnter = hooks.canEnter ? hooks.canEnter() : false;
       leaves.forEach((L, k) => {
         const on = live.has(k);
         if (on !== L.live) { L.live = on; L.el.classList.toggle('is-live', on); }
+        // A page's entrance starts once the page above has begun to lift (or
+        // right away if nothing covers it). It resets once the page is hidden.
+        const revealed = on && canEnter && (k === 0 || leaves[k - 1].p > 0.04 || L.p > 0.001);
+        if (revealed && !L.entered) {
+          L.entered = true;
+          // A page coming back down onto the stack was already seen: show it complete.
+          if (hooks.enter) hooks.enter(k, L.p > 0.001);
+        } else if (!on && L.entered) {
+          L.entered = false;
+          if (hooks.leave) hooks.leave(k);
+        }
       });
     }
 
@@ -495,7 +665,10 @@
         if (!a) continue;
         const t = (time - a.t0) / a.dur;
         if (t < 0) { busy = true; continue; }          // waiting out its stagger delay
-        if (t >= 1) { L.p = a.to; L.anim = null; }
+        if (t >= 1) {
+          L.p = a.to; L.anim = null;
+          if (a.to === 0 && a.from > 0.5 && hooks.land) hooks.land(i);
+        }
         else { L.p = a.from + (a.to - a.from) * a.ease(t); busy = true; }
         paint(i);
       }
@@ -510,12 +683,16 @@
       const atRest = L.p <= 0.0005 || L.p >= 0.9995;
       // From rest the page lifts gently; if it is already moving (released drag,
       // interrupted turn) it simply decelerates into place.
+      // The leaf that uncovers the closing page turns very slowly: the final reveal.
+      const slow = i === total - 2 && total > 2 ? 1.8 : 1;
       L.anim = {
         from: L.p,
         to,
         t0: now() + delay,
-        dur: Math.max(MIN_MS, (TURN_MS * Math.pow(dist, 0.75)) / clamp(speed, 1, 2.4)),
-        ease: atRest ? easeInOut : easeOut,
+        dur: fxs.reduced
+          ? 380
+          : Math.max(MIN_MS, (TURN_MS * slow * Math.pow(dist, 0.75)) / clamp(speed, 1, 2.4)),
+        ease: atRest && !fxs.reduced ? easeInOut : easeOut,
       };
     }
 
@@ -527,7 +704,7 @@
         const L = leaves[i];
         if (L.held) continue;
         const target = targetOf(i);
-        if (immediate || reduced.matches) {
+        if (immediate) {
           L.anim = null;
           L.p = target;
           paint(i);
@@ -563,6 +740,14 @@
       drop(i) { leaves[i].held = false; },
       /** Re-run settle (e.g. after a cancelled drag). */
       settle,
+      /** Re-evaluate which pages are visible/entered (e.g. when the album opens). */
+      refresh() { updateVisibility(); },
+      /** Repaint every leaf (e.g. after the motion tier or reduced-motion changed). */
+      repaint() { for (let i = 0; i < total; i++) paint(i); },
+      /** Forget all entrances (e.g. when the album is closed). */
+      resetEntrances() {
+        leaves.forEach((L, k) => { if (L.entered) { L.entered = false; if (hooks.leave) hooks.leave(k); } });
+      },
       /** True while any leaf is still moving. */
       get busy() { return leaves.some((L) => L.anim); },
     };
@@ -571,11 +756,11 @@
   /* ------------------------------------------------------------------------
      6. Album controller
      ------------------------------------------------------------------------ */
-  function createAlbum(cfg, pages, dom) {
+  function createAlbum(cfg, pages, dom, fxs, hooks) {
     const bus = emitter();
     const total = pages.length;
     const state = { index: 0, view: 'gate', direction: 'forward' };
-    const book = createBook(pages, dom);
+    const book = createBook(pages, dom, fxs, hooks);
 
     book.leaves.forEach((leaf, i) => {
       leaf.el.setAttribute('aria-label', `${cfg.ui.page} ${i + 1} ${cfg.ui.of} ${total}`);
@@ -597,6 +782,7 @@
 
       book.setIndex(index, opts);
       dom.stage.dataset.direction = state.direction;
+      dom.album.dataset.layout = pages[index].layout; // lets CSS tint the light per page
       dom.counterCurrent.textContent = pad2(index + 1);
       dom.album.style.setProperty('--progress', total > 1 ? (index / (total - 1)).toFixed(4) : '1');
       dom.prev.setAttribute('aria-disabled', String(index === 0));
@@ -666,7 +852,291 @@
   }
 
   /* ------------------------------------------------------------------------
-     7. Input
+     7. Motion
+        Everything that makes a page feel alive once it is on screen. The CSS
+        does the choreography (entrances, drift, sway, light, grain) from the
+        classes this module toggles; JS only handles what CSS cannot:
+          - starting / resetting each page's entrance            (hooks.enter/leave)
+          - the small canvas particle fields on a few pages      (dust, petals, sparks)
+          - desktop pointer parallax and the following light
+          - the little settle a page does when it lands on the stack
+        One shared requestAnimationFrame loop drives every particle field and
+        runs only while a field is active; phones are capped at ~30fps.
+     ------------------------------------------------------------------------ */
+  const SCENES = {
+    title:   { dust: 1 },
+    chapter: { dust: 1.2 },
+    closing: { dust: 1.8, ramp: 9000 },  // the finale gathers slowly
+    note:    { dust: 0.5, petals: true }, // tap the page for petals
+  };
+  const PETALS = ['#8f2d44', '#b8935a', '#e9dcc0', '#a63a55'];
+
+  let glow = null;
+  function glowSprite() {
+    if (glow) return glow;
+    glow = document.createElement('canvas');
+    glow.width = glow.height = 48;
+    const g = glow.getContext('2d');
+    const grad = g.createRadialGradient(24, 24, 0, 24, 24, 24);
+    grad.addColorStop(0, 'rgba(244, 218, 164, 1)');
+    grad.addColorStop(0.3, 'rgba(214, 170, 110, 0.55)');
+    grad.addColorStop(1, 'rgba(214, 170, 110, 0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 48, 48);
+    return glow;
+  }
+
+  /** A transparent canvas inside a page: drifting dust plus short-lived petals/sparks. */
+  function createField(face, scene, fxs) {
+    const canvas = h('canvas', { class: 'fx-canvas', 'aria-hidden': 'true' });
+    face.insertBefore(canvas, face.querySelector('.leaf__spine'));
+    const ctx = canvas.getContext('2d');
+    const motes = [];
+    const bits = [];
+    let W = 0;
+    let H = 0;
+    let born = 0;
+
+    const rand = (a, b) => a + Math.random() * (b - a);
+
+    function resize() {
+      const w = face.clientWidth;
+      const h2 = face.clientHeight;
+      if (!w || !h2) return;
+      const dpr = Math.min(window.devicePixelRatio || 1, fxs.tier === 'phone' ? 1.5 : 2);
+      W = w; H = h2;
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h2 * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(resize).observe(face);
+
+    const mote = (initial) => {
+      const z = Math.random(); // depth: far motes are small, dim and slow
+      return {
+        nx: Math.random(), ny: initial ? Math.random() : 1.04, z,
+        r: 2.2 + z * 4.2, vy: -(0.008 + z * 0.026), sway: 5 + z * 11,
+        ph: Math.random() * 6.28, tw: 0.5 + Math.random() * 1.1, a: 0.28 + z * 0.5,
+      };
+    };
+
+    function seed() {
+      const n = Math.round(fxs.dust * (scene.dust || 0));
+      motes.length = 0;
+      for (let i = 0; i < n; i++) motes.push(mote(true));
+    }
+
+    function burst(x, y, n) {
+      const cap = fxs.tier === 'phone' ? 34 : 60;
+      for (let i = 0; i < n && bits.length < cap; i++) {
+        bits.push({
+          kind: 'petal', x, y,
+          vx: rand(-90, 90), vy: -rand(60, 170),
+          rot: rand(0, 6.28), vr: rand(-4, 4), s: rand(4.5, 9), flip: rand(0, 6.28),
+          life: 0, max: rand(2.4, 3.6), col: PETALS[(Math.random() * PETALS.length) | 0],
+        });
+      }
+    }
+
+    function spark(x, y) {
+      if (bits.length > 46) return;
+      bits.push({ kind: 'spark', x, y, vx: rand(-14, 14), vy: -rand(8, 26), s: rand(2.5, 5), life: 0, max: rand(0.9, 1.6) });
+    }
+
+    function step(dt, t) {
+      if (!W) resize();
+      ctx.clearRect(0, 0, W, H);
+      const sprite = glowSprite();
+
+      const ramp = scene.ramp ? 0.25 + 0.75 * Math.min(1, (t * 1000 - born) / scene.ramp) : 1;
+      const shown = Math.round(motes.length * ramp);
+      for (let i = 0; i < shown; i++) {
+        const m = motes[i];
+        m.ny += m.vy * dt;
+        if (m.ny < -0.05) Object.assign(m, mote(false));
+        const edge = clamp(m.ny / 0.14, 0, 1) * clamp((1.04 - m.ny) / 0.14, 0, 1);
+        const alpha = m.a * edge * (0.65 + 0.35 * Math.sin(t * m.tw + m.ph));
+        if (alpha < 0.02) continue;
+        ctx.globalAlpha = alpha;
+        const x = m.nx * W + Math.sin(t * 0.35 + m.ph) * m.sway;
+        ctx.drawImage(sprite, x - m.r, m.ny * H - m.r, m.r * 2, m.r * 2);
+      }
+
+      for (let i = bits.length - 1; i >= 0; i--) {
+        const b = bits[i];
+        b.life += dt;
+        if (b.life >= b.max) { bits.splice(i, 1); continue; }
+        const fade = clamp((b.max - b.life) / 0.7, 0, 1);
+        if (b.kind === 'spark') {
+          b.x += b.vx * dt; b.y += b.vy * dt;
+          ctx.globalAlpha = fade * 0.8;
+          ctx.drawImage(sprite, b.x - b.s, b.y - b.s, b.s * 2, b.s * 2);
+          continue;
+        }
+        b.vy += 150 * dt;                         // gravity
+        b.vx *= 1 - 0.9 * dt; b.vy *= 1 - 1.3 * dt; // air drag: petals float, they do not fall
+        b.x += (b.vx + Math.sin(b.life * 4 + b.flip) * 26) * dt;
+        b.y += b.vy * dt;
+        b.rot += b.vr * dt;
+        ctx.save();
+        ctx.globalAlpha = fade * 0.9;
+        ctx.translate(b.x, b.y);
+        ctx.rotate(b.rot);
+        ctx.scale(1, 0.5 + 0.5 * Math.abs(Math.sin(b.life * 5 + b.flip))); // tumbling
+        ctx.fillStyle = b.col;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, b.s, b.s * 0.55, 0, 0, 6.2832);
+        ctx.fill();
+        ctx.restore();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    return {
+      canvas, burst, spark, step,
+      begin(t) { born = t; seed(); resize(); },
+      reseed: seed,
+      end() { motes.length = 0; bits.length = 0; if (W) ctx.clearRect(0, 0, W, H); },
+      point(e) { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top, w: r.width }; },
+    };
+  }
+
+  function createMotion(album, dom, fxs) {
+    const book = album.book;
+    const leaves = book.leaves;
+    const fields = new Map();   // leaf index -> field
+    const active = new Set();
+    let raf = 0;
+    let last = 0;
+    let opening = 0;            // until this time the first page waits for the album to fade in
+    let landTimer = 0;
+
+    /* ---- shared particle loop ---- */
+    function loop(t) {
+      raf = 0;
+      if (!active.size) return;
+      if (last && (fxs.tier === 'phone' || fxs.lite) && t - last < 30) { raf = requestAnimationFrame(loop); return; }
+      const dt = last ? Math.min(0.05, (t - last) / 1000) : 0.016;
+      last = t;
+      active.forEach((f) => f.step(dt, t / 1000));
+      raf = requestAnimationFrame(loop);
+    }
+    const wake = () => { if (!raf) { last = 0; raf = requestAnimationFrame(loop); } };
+
+    function startScene(i) {
+      const scene = SCENES[leaves[i].el.dataset.layout];
+      if (!scene || fxs.reduced) return;
+      let field = fields.get(i);
+      if (!field) {
+        field = createField(leaves[i].el.querySelector('.leaf__face'), scene, fxs);
+        fields.set(i, field);
+        if (scene.petals) bindPetals(leaves[i].el, field);
+      }
+      field.begin(performance.now());
+      active.add(field);
+      wake();
+    }
+
+    function stopScene(i) {
+      const field = fields.get(i);
+      if (!field) return;
+      field.end();
+      active.delete(field);
+    }
+
+    /* Tap (or click) the message page: a small burst of petals. On a mouse,
+       moving across the page also leaves a faint trail of light. */
+    function bindPetals(leafEl, field) {
+      let lastSpark = 0;
+      leafEl.addEventListener('click', (e) => {
+        if (fxs.reduced || !active.has(field)) return;
+        const p = field.point(e);
+        field.burst(p.x, p.y, fxs.tier === 'phone' ? 12 : 22);
+      });
+      leafEl.addEventListener('pointermove', (e) => {
+        if (e.pointerType !== 'mouse' || fxs.reduced || !active.has(field)) return;
+        const t = performance.now();
+        if (t - lastSpark < 55) return;
+        lastSpark = t;
+        const p = field.point(e);
+        field.spark(p.x, p.y);
+      });
+    }
+
+    /* ---- desktop pointer parallax + the light that follows the pointer ---- */
+    const follow = $('#light-follow');
+    const targets = leaves.flatMap((L) =>
+      [...L.el.querySelectorAll('[data-pointer]')].map((el) => ({ el, s: Number(el.dataset.pointer) || 0 })));
+    const ptr = { tx: 0, ty: 0, x: 0, y: 0, raf: 0 };
+
+    function ptrApply() {
+      const on = fxs.tier === 'desktop' && !fxs.reduced;
+      for (const t of targets) t.el.style.translate = on ? `${(-ptr.x * t.s).toFixed(2)}px ${(-ptr.y * t.s * 0.7).toFixed(2)}px` : '';
+      if (follow) follow.style.translate = on ? `${(ptr.x * 70).toFixed(1)}px ${(ptr.y * 46).toFixed(1)}px` : '';
+    }
+    function ptrFrame() {
+      ptr.raf = 0;
+      ptr.x += (ptr.tx - ptr.x) * 0.07;
+      ptr.y += (ptr.ty - ptr.y) * 0.07;
+      ptrApply();
+      if (Math.abs(ptr.tx - ptr.x) > 0.002 || Math.abs(ptr.ty - ptr.y) > 0.002) ptr.raf = requestAnimationFrame(ptrFrame);
+    }
+    window.addEventListener('pointermove', (e) => {
+      if (e.pointerType !== 'mouse' || fxs.tier !== 'desktop' || fxs.reduced || album.view !== 'album') return;
+      ptr.tx = (e.clientX / window.innerWidth) * 2 - 1;
+      ptr.ty = (e.clientY / window.innerHeight) * 2 - 1;
+      if (!ptr.raf) ptr.raf = requestAnimationFrame(ptrFrame);
+    }, { passive: true });
+
+    /* ---- the settle when a page lands on the stack ---- */
+    function flutter(i) {
+      if (fxs.reduced) return;
+      // Two identical keyframe sets, alternated, restart the settle without forcing a reflow.
+      const el = leaves[i].el;
+      const flip = el.classList.contains('is-landed-a');
+      el.classList.remove('is-landed-a', 'is-landed-b');
+      el.classList.add(flip ? 'is-landed-b' : 'is-landed-a');
+    }
+    album.on('change', ({ direction }) => {
+      clearTimeout(landTimer);
+      if (direction === 'forward') landTimer = setTimeout(() => flutter(album.index), 880);
+    });
+
+    /* ---- album open / close ---- */
+    album.on('view', ({ view }) => {
+      if (view === 'album') { opening = performance.now() + 1100; book.refresh(); } else book.resetEntrances();
+    });
+
+    fxs.onChange(() => {
+      book.repaint();
+      ptrApply();
+      active.forEach((f) => (fxs.reduced ? f.end() : f.reseed()));
+      if (fxs.reduced) active.clear();
+    });
+
+    return {
+      canEnter: () => album.view === 'album',
+      enter(i, instant) {
+        const el = leaves[i].el;
+        el.classList.remove('is-reset');
+        el.classList.toggle('is-instant', instant);
+        if (!instant && performance.now() < opening) el.style.setProperty('--base', '1000ms');
+        else el.style.removeProperty('--base');
+        el.classList.add('is-entered');
+        startScene(i);
+      },
+      leave(i) {
+        const el = leaves[i].el;
+        el.classList.remove('is-entered', 'is-instant', 'is-landed-a', 'is-landed-b');
+        el.classList.add('is-reset'); // snap back to the hidden state without animating
+        stopScene(i);
+      },
+      land: flutter,
+    };
+  }
+
+  /* ------------------------------------------------------------------------
+     8. Input
      ------------------------------------------------------------------------ */
   function initKeyboard(album) {
     let last = 0;
@@ -861,28 +1331,13 @@
     }, { passive: false });
   }
 
-  /** Publishes pointer position (-1…1) for desktop-only effects. */
-  function initPointerTracking() {
-    if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
-    const root = document.documentElement;
-    root.classList.add('fine-pointer');
-    let frame = 0;
-    let x = 0;
-    let y = 0;
-    window.addEventListener('pointermove', (e) => {
-      x = (e.clientX / window.innerWidth) * 2 - 1;
-      y = (e.clientY / window.innerHeight) * 2 - 1;
-      if (frame) return;
-      frame = requestAnimationFrame(() => {
-        frame = 0;
-        root.style.setProperty('--mx', x.toFixed(3));
-        root.style.setProperty('--my', y.toFixed(3));
-      });
-    }, { passive: true });
+  /** Marks fine-pointer devices so CSS can offer hover affordances. */
+  function initPointerClass() {
+    if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) document.documentElement.classList.add('fine-pointer');
   }
 
   /* ------------------------------------------------------------------------
-     8. Music
+     9. Music
      ------------------------------------------------------------------------ */
   function initMusic(cfg, album, button) {
     const src = resolveAsset(cfg.music.src, cfg.base.music);
@@ -930,7 +1385,7 @@
   }
 
   /* ------------------------------------------------------------------------
-     9. Boot
+     10. Boot
      ------------------------------------------------------------------------ */
   function boot() {
     const cfg = loadConfig();
@@ -965,7 +1420,11 @@
       status: $('#status'),
     };
 
-    const album = createAlbum(cfg, buildPages(cfg), dom);
+    const fxs = createSettings(cfg);
+    const hooks = {};
+    const album = createAlbum(cfg, buildPages(cfg), dom, fxs, hooks);
+    Object.assign(hooks, createMotion(album, dom, fxs));
+    album.book.refresh();
 
     dom.openBtn.addEventListener('click', () => album.open());
     $('#close-btn').addEventListener('click', () => album.close());
@@ -979,7 +1438,7 @@
 
     initKeyboard(album);
     initGestures(album, dom);
-    initPointerTracking();
+    initPointerClass();
     initMusic(cfg, album, $('#sound-btn'));
 
     // Exposed for the console and for later experiments.
