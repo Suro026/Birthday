@@ -67,8 +67,15 @@
       <span class="progress" id="progress" aria-hidden="true"></span>
     </header>
 
-    <!-- Pages are generated from the configuration by script.js -->
-    <div class="stage" id="stage" tabindex="-1" role="region"></div>
+    <!-- Leaves (pages) are generated from the configuration by script.js
+         and inserted into .book, beneath the two edge hot-spots. -->
+    <div class="stage" id="stage" tabindex="-1" role="region">
+      <div class="book" id="book">
+        <span class="book__block" aria-hidden="true"></span>
+        <span class="hotspot hotspot--prev" id="hot-prev" data-dir="prev" aria-hidden="true"></span>
+        <span class="hotspot hotspot--next" id="hot-next" data-dir="next" aria-hidden="true"></span>
+      </div>
+    </div>
 
     <nav class="album__nav" aria-label="Pages">
       <button class="nav-btn nav-btn--prev" id="prev-btn" type="button">

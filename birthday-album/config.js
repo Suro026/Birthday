@@ -20,7 +20,7 @@ window.ALBUM_CONFIG = {
     name: 'Anaya',
   },
 
-  /* Her birthday. Shown on the title page when titlePage.showDate is true. */
+  /* Her birthday. Shown on the title page when its showDate is true. */
   birthday: {
     date: '2000-10-14',
   },
@@ -33,26 +33,6 @@ window.ALBUM_CONFIG = {
     hint: 'Swipe, or use the arrow keys',
   },
 
-  /* First page inside the album. */
-  titlePage: {
-    eyebrow: 'Happy Birthday',
-    subtitle: 'A small collection of the days I would live again.',
-    showDate: true,
-  },
-
-  /* The birthday message. One string per paragraph. Set enabled:false to skip. */
-  letter: {
-    enabled: true,
-    heading: 'A few words',
-    paragraphs: [
-      'Some people arrive like weather. You arrived like a season — slowly, then all at once, and somehow everything was different.',
-      'I made this book because a message felt too small. These are the days I keep returning to, in the order my heart keeps them.',
-      'Happy birthday. Thank you for every page so far, and for the ones we have not written yet.',
-    ],
-    signoff: 'Always,',
-    signature: 'Yours',
-  },
-
   /* Folders that photo and music file names are resolved against.
      Absolute URLs ("https://…") and root paths ("/…") are used as they are. */
   base: {
@@ -60,44 +40,95 @@ window.ALBUM_CONFIG = {
     music: 'assets/music/',
   },
 
-  /* One entry per memory page, in order.
-       photo   file name inside base.photos          (missing files show a placeholder plate)
-       date    "YYYY-MM-DD" or free text
-       title   optional heading above the caption
-       caption the line of text under the photograph
-       alt     optional description for screen readers (defaults to the caption)
-       focus   optional CSS object-position, e.g. "50% 25%" to keep faces in frame */
-  memories: [
-    {
-      photo: '01.jpg',
-      date: '2023-02-14',
-      title: 'The first one',
-      caption: 'We said we would stay for one coffee. The café closed around us.',
-      focus: '50% 40%',
-    },
-    {
-      photo: '02.jpg',
-      date: '2023-08-05',
-      title: 'Somewhere by the water',
-      caption: 'You laughed at the exact moment the light went gold. I did not look at the sunset.',
-      focus: '50% 50%',
-    },
-    {
-      photo: '03.jpg',
-      date: '2024-01-20',
-      title: 'An ordinary Saturday',
-      caption: 'Nothing happened, and it is still my favourite day.',
-      focus: '50% 30%',
-    },
-  ],
+  /* ------------------------------------------------------------------------
+     THE PAGES — one entry per physical page, in order.
+     `layout` chooses the composition:
 
-  /* Final page. */
-  closing: {
-    enabled: true,
-    heading: 'Happy Birthday',
-    text: 'To many more pages.',
-    restartLabel: 'Back to the beginning',
-  },
+       title    cover plate           eyebrow, subtitle, showDate
+       full     full-bleed photograph photo, date, title, caption
+       single   matted photograph     photo, date, title, caption
+       duo      large + small print   photos[2], date, title, caption
+       corners  prints on corners     photos[3], date
+       strip    contact sheet         heading, photos[3] (each: date, caption)
+       mosaic   one large, two small  photos[3], date, title, caption
+       chapter  wine divider          numeral, title, caption
+       note     the written message   heading, paragraphs[], signoff, signature
+       closing  last page             heading, text, restartLabel
+
+     A photo is { photo, alt, focus, date, title, caption }.
+       photo  file name inside base.photos (a missing file shows a placeholder plate)
+       focus  CSS object-position, e.g. "50% 25%", to keep faces in frame
+       date   "YYYY-MM-DD" or free text
+     For single-photo layouts you can put these fields on the page itself.
+     ------------------------------------------------------------------------ */
+  pages: [
+    { layout: 'title',
+      eyebrow: 'Happy Birthday',
+      subtitle: 'Placeholder subtitle — a short line that introduces the album.',
+      showDate: true },
+
+    { layout: 'full',
+      photo: '01.jpg', focus: '50% 40%',
+      date: '2023-02-14', title: 'Full-bleed page',
+      caption: 'Placeholder caption for a photograph that runs to the edges.' },
+
+    { layout: 'single',
+      photo: '02.jpg', focus: '50% 35%',
+      date: '2023-05-21', title: 'Matted page',
+      caption: 'Placeholder caption beneath a single, quietly framed photograph.' },
+
+    { layout: 'duo',
+      photos: [
+        { photo: '03.jpg', focus: '50% 40%' },
+        { photo: '04.jpg', focus: '50% 50%' },
+      ],
+      date: '2023-08-05', title: 'Two prints',
+      caption: 'Placeholder caption for a pair of photographs.' },
+
+    { layout: 'chapter',
+      numeral: 'II',
+      title: 'Chapter title',
+      caption: 'Placeholder line for a chapter opener.' },
+
+    { layout: 'corners',
+      photos: [
+        { photo: '05.jpg', focus: '50% 40%' },
+        { photo: '06.jpg', focus: '50% 30%' },
+        { photo: '07.jpg', focus: '50% 50%' },
+      ],
+      date: '2023-11-12', title: 'Mounted prints' },
+
+    { layout: 'note',
+      heading: 'A few words',
+      paragraphs: [
+        'Placeholder for the birthday message. The final words will go here.',
+        'A second short paragraph, set in the same quiet serif.',
+      ],
+      signoff: 'Always,',
+      signature: 'Yours' },
+
+    { layout: 'strip',
+      heading: 'Contact sheet',
+      photos: [
+        { photo: '08.jpg', date: '2024-01-20', caption: 'Placeholder frame one' },
+        { photo: '09.jpg', date: '2024-03-02', caption: 'Placeholder frame two' },
+        { photo: '10.jpg', date: '2024-04-18', caption: 'Placeholder frame three' },
+      ] },
+
+    { layout: 'mosaic',
+      photos: [
+        { photo: '11.jpg', focus: '50% 40%' },
+        { photo: '12.jpg', focus: '50% 40%' },
+        { photo: '13.jpg', focus: '50% 40%' },
+      ],
+      date: '2024-06-09', title: 'Mosaic page',
+      caption: 'Placeholder caption for a larger photograph and two companions.' },
+
+    { layout: 'closing',
+      heading: 'Happy Birthday',
+      text: 'Placeholder closing line.',
+      restartLabel: 'Back to the beginning' },
+  ],
 
   /* Background music. Leave src empty for a silent album.
      The sound button only appears when a file is configured.
