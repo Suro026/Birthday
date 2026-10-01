@@ -24,6 +24,7 @@
   --hairline: rgba(15, 13, 12, 0.14);
 
   --serif: "Cormorant Garamond", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --hand: "La Belle Aurore", "Segoe Script", "Bradley Hand", "Brush Script MT", cursive;
   --sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
@@ -442,13 +443,15 @@ img { display: block; max-width: 100%; }
 .photo {
   --mat: 0px;
   position: relative;
+  width: 100%;
+  height: 100%;
   min-width: 0;
   min-height: 0;
   margin: 0;
 }
 .photo__well {
   position: absolute;
-  inset: var(--mat);
+  inset: var(--mat) var(--mat) var(--chin, var(--mat));
   overflow: hidden;
   background-color: var(--ivory-deep);
 }
@@ -483,10 +486,40 @@ img { display: block; max-width: 100%; }
 .photo[data-tone="1"] .photo__missing { background-color: #1d1716; }
 .photo[data-tone="2"] .photo__missing { background-color: #77634c; color: #f3ede0; }
 
-.photo--mat   { --mat: clamp(6px, 2.4cqw, 12px);  background-color: #faf6ec; box-shadow: 0 0 0 1px rgba(15, 13, 12, 0.12); }
-.photo--print { --mat: clamp(4px, 1.6cqw, 8px);   background-color: #faf6ec; box-shadow: 0 1px 2px rgba(15, 13, 12, 0.35); }
-.photo--frame { box-shadow: 0 0 0 1px rgba(15, 13, 12, 0.14); }
-.photo--bleed { position: relative; }
+/* Printed photographs: a card mat, a polaroid, a thin-bordered print, or no border at all.
+   Shadows are layered the way a real print sits on paper: a tight contact shadow,
+   a soft mid shadow and a long, faint one. */
+.photo--mat, .photo--polaroid, .photo--frame {
+  --print-shadow: 0 1px 1px rgba(24, 14, 6, 0.3), 0 4px 7px -2px rgba(24, 14, 6, 0.28), 0 14px 22px -10px rgba(24, 14, 6, 0.4);
+  box-shadow: var(--print-shadow);
+}
+.photo--mat      { --mat: clamp(6px, 2.4cqw, 12px); background-color: #faf6ec; }
+.photo--polaroid { --mat: clamp(7px, 3.1cqw, 15px); --chin: clamp(36px, 14cqw, 66px); background-color: #fbf8ef; }
+.photo--frame    { --mat: clamp(3px, 1.1cqw, 6px);  background-color: #faf6ec; }
+.photo--bleed    { --mat: 0px; }
+
+/* The surface of the card: a faint matte grain over the whole print. */
+.photo__paper { position: absolute; inset: 0; z-index: 3; pointer-events: none; background-image: var(--grain); opacity: 0.12; }
+
+/* The caption written on a polaroid's white border. */
+.photo__chin {
+  position: absolute; left: var(--mat); right: var(--mat); bottom: 0; height: var(--chin); z-index: 4;
+  display: grid; place-items: center; padding: 0 0.3em; overflow: hidden;
+  text-align: center; font-size: clamp(0.78rem, 4.3cqw, 1.18rem); line-height: 1.05;
+}
+
+/* Handwriting: a fine pen, slightly off the horizontal. */
+.hand { font-family: var(--hand); font-weight: 400; color: #3a2a22; line-height: 1.2; }
+
+/* Strips of tape holding a print down. */
+.tape {
+  position: absolute; z-index: 5; pointer-events: none;
+  width: 21cqw; height: 5.4cqw;
+  background-color: rgba(232, 219, 183, 0.82);
+  box-shadow: 0 1px 2px rgba(24, 14, 6, 0.22), inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+.tape--top    { top: -2.6cqw; left: 50%; margin-left: -10.5cqw; transform: rotate(-2.6deg); }
+.tape--corner { top: -0.4cqw; right: -6.4cqw; width: 18cqw; transform: rotate(38deg); }
 
 /* Canvas particle field inside a page (dust, petals, sparks) */
 .fx-canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
@@ -541,100 +574,147 @@ img { display: block; max-width: 100%; }
   line-height: 1.4;
 }
 
-/* full: photograph to the edges, caption strip beneath --------------- */
-.page--full { padding: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto; }
-.full__text {
-  display: grid;
-  gap: 0.35rem;
-  padding: clamp(14px, 5cqw, 26px) var(--m) clamp(16px, 6cqw, 30px) calc(var(--m) + var(--gut));
-}
-
-/* single: one matted photograph ------------------------------------ */
-.page--single {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: clamp(10px, 4cqw, 20px);
-  padding-top: calc(var(--m) * 0.9);
-  text-align: center;
-}
-.page--single .meta { justify-content: center; }
-.single__text { display: grid; gap: 0.3rem; }
-
-/* duo: a large print with a smaller one laid over it ---------------- */
-.page--duo { padding: 0; }
-.duo__a { position: absolute; left: calc(var(--m) + var(--gut)); top: var(--m); width: calc(100% - var(--m) * 2 - var(--gut) - 14cqw); height: 47%; }
-.duo__b { position: absolute; right: var(--m); top: 43%; width: 50%; height: 27%; z-index: 2; transform: rotate(1.6deg); }
-.duo__text {
+/* Slots: where a print sits on the page. Placement and tilt come from config; tapping
+   lifts the print a little (and, on the interactive page, brings it to the middle). */
+.slot {
   position: absolute;
+  z-index: var(--z, 1);
+  transform: translate3d(var(--tx, 0px), var(--ty, 0px), 0) rotate(var(--rot, var(--tilt, 0deg))) scale(var(--zoom, 1));
+  transition: transform 0.8s var(--ease-soft), opacity 0.6s ease;
+  -webkit-tap-highlight-color: transparent;
+  outline-offset: 6px;
+}
+.slot--flow { position: relative; }
+.slot[data-memory] { cursor: pointer; }
+.slot.is-open { --rot: 0deg; --zoom: var(--lift-zoom, var(--open-zoom, 1.07)); z-index: 40; }
+.page.has-open .slot:not(.is-open) { opacity: 0.42; }
+
+/* The paper slip that carries the caption, date and description of the open photograph. */
+.memo {
+  position: absolute; z-index: 60;
   left: calc(var(--m) + var(--gut)); right: var(--m); bottom: var(--m);
   display: grid; gap: 0.3rem;
+  padding: 4.2cqw 4.6cqw 4cqw;
+  background-color: #faf6ec; color: var(--ink);
+  box-shadow: 0 1px 1px rgba(24, 14, 6, 0.3), 0 8px 14px -6px rgba(24, 14, 6, 0.4), 0 22px 30px -16px rgba(24, 14, 6, 0.45);
+  transform: rotate(-0.7deg);
+  opacity: 0; translate: 0 14px; pointer-events: none;
+  transition: opacity 0.5s var(--ease-soft), translate 0.65s var(--ease-soft);
 }
-.duo__text .page__caption { font-size: clamp(0.95rem, 4.4cqw, 1.2rem); }
+.memo[data-at="top"] { top: var(--m); bottom: auto; }
+.page.has-open .memo { opacity: 1; translate: none; }
+.memo p:empty { display: none; }
+.memo__cap { font-size: clamp(1.1rem, 6cqw, 1.6rem); }
+.memo__desc { font-family: var(--serif); font-size: clamp(0.92rem, 4.2cqw, 1.12rem); line-height: 1.42; color: #4a3b33; }
+.memo .tape { top: -2.4cqw; left: auto; right: 10%; margin: 0; width: 15cqw; height: 4.4cqw; transform: rotate(3deg); }
 
-/* corners: prints held by black photo corners ------------------------ */
-.page--corners { padding: 0; }
-.photo--print { position: absolute; }
-.photo--print::before, .photo--print::after {      /* the black corners */
-  content: "";
-  position: absolute;
-  width: 11%;
-  aspect-ratio: 1;
-  background-color: #1b1614;
-  z-index: 2;
-  pointer-events: none;
+/* 1 · opening ------------------------------------------------------- */
+.page--opening {
+  display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: clamp(8px, 3cqw, 16px);
+  text-align: center; padding-top: calc(var(--m) * 0.9);
 }
-.photo--print::before { left: -1px; top: -1px; clip-path: polygon(0 0, 100% 0, 0 100%); }
-.photo--print::after  { right: -1px; bottom: -1px; clip-path: polygon(100% 0, 100% 100%, 0 100%); }
-.print--1 { left: calc(var(--m) + var(--gut)); top: 7%; width: 49%; aspect-ratio: 4 / 3; transform: rotate(-2.6deg); }
-.print--2 { right: var(--m); top: 31%; width: 42%; aspect-ratio: 4 / 5; transform: rotate(2.4deg); z-index: 2; }
-.print--3 { left: calc(var(--m) + var(--gut) + 3cqw); bottom: 8%; width: 54%; aspect-ratio: 3 / 2; transform: rotate(-1.2deg); z-index: 3; }
-.corners__text {
-  position: absolute;
-  right: var(--m); top: 7%;
-  width: 31%;
-  display: grid; gap: 0.4rem;
-}
-.corners__text .eyebrow { letter-spacing: 0.14em; }
-.corners__text .meta { display: grid; }
-.corners__text .page__title { font-size: clamp(1rem, 5.4cqw, 1.4rem); }
+.opening__head { display: grid; gap: 0.2rem; justify-items: center; }
+.opening__name { font-family: var(--serif); font-weight: 300; font-size: clamp(1.9rem, 12cqw, 3.5rem); line-height: 1; }
+.opening__print { min-height: 0; display: grid; place-items: center; padding-block: 2cqw; }
+.opening__print .slot { height: 100%; width: auto; max-width: 100%; }
+.opening__foot { display: grid; gap: 0.2rem; justify-items: center; }
+.opening__caption { font-size: clamp(1.2rem, 6.6cqw, 1.9rem); transform: rotate(-1.2deg); }
 
-/* strip: a contact sheet ------------------------------------------- */
-.page--strip { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 0; }
-.strip__rows { position: relative; display: grid; grid-template-rows: repeat(3, minmax(0, 1fr)); min-height: 0; }
-.strip__head { display: grid; gap: 0.35rem; padding-bottom: clamp(8px, 3cqw, 16px); }
-.strip__heading { font-family: var(--serif); font-weight: 400; font-size: clamp(1.4rem, 8.5cqw, 2.2rem); line-height: 1.05; }
-.strip__row {
-  display: grid;
-  grid-template-columns: 38% 1fr;
-  align-items: center;
-  gap: clamp(12px, 5cqw, 24px);
-  min-height: 0;
-  padding-block: clamp(6px, 2.4cqw, 12px);
-}
-.strip__row::before {                  /* the hairline above each row */
-  content: "";
-  position: absolute; left: 0; right: 0; top: 0;
-  height: 1px;
-  background: var(--hairline);
-}
-.strip__row { position: relative; }
-.strip__row .photo { width: 100%; max-height: 100%; aspect-ratio: 1; }
-.strip__text { display: grid; gap: 0.3rem; align-content: center; }
-.strip__text .page__caption { font-size: clamp(0.95rem, 4.4cqw, 1.2rem); }
+/* 2 · collage, 6 · polaroids, 7 · interactive: free composition of prints */
+.page--collage, .page--polaroids, .page--interactive { padding: 0; }
 
-/* mosaic: one large, two small -------------------------------------- */
-.page--mosaic {
-  display: grid;
-  grid-template-columns: 1.1fr 1fr;
-  grid-template-rows: minmax(0, 1.5fr) minmax(0, 1fr) auto;
-  grid-template-areas: "a a" "b c" "t t";
-  gap: clamp(8px, 2.6cqw, 14px);
+/* 3 · full-screen-style photograph ------------------------------------ */
+.page--full { padding: 0; }
+.page--full .slot { position: absolute; inset: 0; width: 100%; height: 100%; aspect-ratio: auto !important; }
+.page--full .slot.is-open { --zoom: 1; }
+.full__label {
+  position: absolute; z-index: 5; left: calc(var(--m) + var(--gut)); right: var(--m); bottom: var(--m);
+  display: grid; gap: 0.3rem; color: var(--ivory); text-shadow: 0 1px 16px rgba(0, 0, 0, 0.5);
+  transition: opacity 0.5s ease; pointer-events: none;
 }
-.mosaic__a { grid-area: a; }
-.mosaic__b { grid-area: b; }
-.mosaic__c { grid-area: c; }
-.mosaic__text { grid-area: t; display: grid; gap: 0.25rem; padding-top: clamp(4px, 2cqw, 10px); }
-.mosaic__text .page__caption { font-size: clamp(0.95rem, 4.4cqw, 1.2rem); }
+.full__label .eyebrow, .full__label .meta__date { color: var(--ivory); opacity: 0.85; }
+.full__title { font-family: var(--serif); font-weight: 400; font-size: clamp(1.4rem, 8.5cqw, 2.3rem); line-height: 1.08; }
+.page.has-open .full__label { opacity: 0; }
+.full__scrim {
+  position: absolute; z-index: 4; left: 0; right: 0; bottom: 0; height: 58%; pointer-events: none;
+  background: linear-gradient(to top, rgba(10, 6, 4, 0.62), rgba(10, 6, 4, 0));
+  opacity: 0.55; transition: opacity 0.9s ease;
+}
+.page.has-open .full__scrim { opacity: 1; }
+.page--full .memo { background: none; box-shadow: none; padding: 0; color: var(--ivory); transform: none; text-shadow: 0 1px 14px rgba(0, 0, 0, 0.5); }
+.page--full .memo .eyebrow { color: var(--gold-on-wine); }
+.page--full .memo .hand, .page--full .memo__cap { color: var(--ivory); }
+.page--full .memo__desc { color: rgba(243, 237, 224, 0.88); }
+.page--full .memo .tape { display: none; }
+
+/* 4 · little things I love about you ------------------------------- */
+.page--list { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: clamp(8px, 3cqw, 16px); }
+.list__head { display: grid; gap: 0.35rem; }
+.list__title { font-family: var(--serif); font-weight: 400; font-size: clamp(1.4rem, 8cqw, 2.05rem); line-height: 1.06; }
+.list__items { list-style: none; margin: 0; padding: 0; display: grid; align-content: space-evenly; min-height: 0; }
+.list__item {
+  position: relative; display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 3.4cqw;
+  padding-block: 0.55em; font-family: var(--serif); font-size: clamp(0.95rem, 4.5cqw, 1.2rem); line-height: 1.28;
+}
+.list__num { font-family: var(--sans); font-size: 0.56em; letter-spacing: 0.2em; color: var(--gold-ink); }
+.list__item::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--hairline);
+  transform-origin: 0 50%; scale: 0 1;
+  transition: scale 1100ms var(--ease-slow); transition-delay: calc(var(--base) + var(--rd, 0ms) + 500ms);
+}
+.leaf.is-entered .list__item::after { scale: 1; }
+.list__photo { display: none; }
+@container (min-width: 430px) {
+  .list__photo { display: block; position: absolute; right: var(--m); bottom: var(--m); width: 31%; }
+  .list__items { padding-right: 36cqw; }
+}
+
+/* 5 · timeline ---------------------------------------------------------- */
+.page--timeline { display: grid; grid-template-rows: auto minmax(0, 1fr); }
+.tl__head { display: grid; gap: 0.35rem; padding-bottom: clamp(8px, 3cqw, 16px); }
+.tl__heading { font-family: var(--serif); font-weight: 400; font-size: clamp(1.4rem, 8.5cqw, 2.2rem); line-height: 1.05; }
+.tl__rows { position: relative; display: grid; grid-template-rows: repeat(4, minmax(0, 1fr)); min-height: 0; }
+.tl__row {
+  position: relative; display: grid; grid-template-columns: 31% 1fr; align-items: center; min-height: 0;
+  gap: clamp(12px, 5cqw, 24px); padding-block: clamp(5px, 1.8cqw, 9px);
+}
+.tl__row::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1px; background: var(--hairline);
+  transform-origin: 0 50%; scale: 0 1;
+  transition: scale calc(1100ms * var(--tk)) var(--ease-slow); transition-delay: calc(var(--base) + var(--rd, 0ms));
+}
+.leaf.is-entered .tl__row::before { scale: 1; }
+.tl__row .slot { height: 100%; width: auto; max-width: 100%; justify-self: start; }
+.tl__text { display: grid; gap: 0.2rem; align-content: center; min-width: 0; }
+.tl__caption { font-size: clamp(1rem, 5.3cqw, 1.45rem); }
+.tl__line {
+  position: absolute; z-index: 1; left: calc(-1 * var(--gut) - 6px); top: 5%; bottom: 5%; width: 1px; background: var(--gold);
+}
+.tl__node {
+  position: absolute; z-index: 2; top: 50%; left: calc(-1 * var(--gut) - 9.5px);
+  width: 8px; height: 8px; margin-top: -4px; border-radius: 50%; background: var(--ivory); border: 1px solid var(--gold);
+  transition-delay: calc(var(--base) + var(--rd, 0ms)) !important;
+}
+
+/* 7 · interactive ------------------------------------------------------- */
+.interactive__title { position: absolute; z-index: 2; left: calc(var(--m) + var(--gut)); top: calc(var(--m) * 0.55); font-size: clamp(1.15rem, 6.4cqw, 1.8rem); }
+.interactive__hint { position: absolute; z-index: 2; left: 0; right: 0; bottom: calc(var(--m) * 0.55); text-align: center; color: var(--gold-ink); transition: opacity 0.5s ease; }
+.page--interactive.has-open .slot:not(.is-open) { opacity: 0.22; }
+.page.has-open .interactive__hint { opacity: 0 !important; transition-delay: 0s !important; }
+
+/* 8 · final reveal ---------------------------------------------------- */
+.page--reveal {
+  display: grid; grid-template-rows: auto minmax(0, 1fr) auto; justify-items: center; text-align: center;
+  gap: clamp(8px, 3cqw, 18px); color: var(--ivory);
+}
+.reveal__heading { font-family: var(--serif); font-weight: 300; font-size: clamp(2rem, 13cqw, 3.9rem); line-height: 1; }
+.reveal__print { width: 100%; min-height: 0; display: grid; place-items: center; padding-block: 2cqw; }
+.reveal__print .slot { height: 100%; width: auto; max-width: 100%; }
+.reveal__foot { display: grid; gap: 0.7rem; justify-items: center; }
+.reveal__line { color: var(--gold-on-wine); font-size: clamp(1.15rem, 6.2cqw, 1.7rem); }
+.page--reveal .memo { background-color: #2a0f17; color: var(--ivory); }
+.page--reveal .memo .hand, .page--reveal .memo__cap { color: var(--ivory); }
+.page--reveal .memo__desc { color: rgba(243, 237, 224, 0.85); }
 
 /* chapter: a wine divider -------------------------------------------- */
 .page--chapter { align-items: center; justify-content: center; text-align: center; gap: clamp(14px, 6cqw, 30px); }
@@ -657,7 +737,7 @@ img { display: block; max-width: 100%; }
 .note__p { font-family: var(--serif); font-size: clamp(1.05rem, 5.6cqw, 1.5rem); line-height: 1.5; }
 .note__sign { display: grid; gap: 0.2rem; }
 .note__signoff { font-family: var(--serif); font-style: italic; font-size: clamp(1rem, 5cqw, 1.3rem); }
-.note__signature { position: relative; display: inline-block; justify-self: start; font-family: var(--serif); font-weight: 300; font-size: clamp(1.7rem, 10cqw, 2.6rem); line-height: 1.1; }
+.note__signature { justify-self: start; font-size: clamp(1.6rem, 9cqw, 2.4rem); }
 .note__sign { position: relative; }
 .note__spark { position: absolute; left: calc(100% - 4cqw); bottom: 0.9rem; width: 9px; height: 9px; border-radius: 50%; border: 1px solid var(--gold); }
 .note__sprig { position: absolute; right: calc(var(--m) * 0.8); bottom: calc(var(--m) * 0.7); width: 15cqw; pointer-events: none; }
@@ -763,7 +843,7 @@ img { display: block; max-width: 100%; }
 /* -- Entrances -------------------------------------------------------- */
 .leaf [data-fx] { --t0: calc(var(--t, 1000ms) * var(--tk)); --dly: calc(var(--base) + var(--rd, 0ms) + var(--d, 0ms)); }
 
-.leaf [data-fx="rise"], .leaf [data-fx="fade"], .leaf [data-fx="drop"], .leaf [data-fx="wipe"],
+.leaf [data-fx="rise"], .leaf [data-fx="fade"], .leaf [data-fx="drop"],
 .leaf [data-fx="draw"], .leaf [data-fx="draw-dot"], .leaf [data-fx="draw-line"] { opacity: 0; }
 .leaf [data-fx="rise"] { translate: 0 var(--fx-dist); filter: blur(var(--fx-blur)); }
 .leaf [data-fx="drop"] {
@@ -788,8 +868,7 @@ img { display: block; max-width: 100%; }
 .leaf [data-fx="draw-line"] { transition-timing-function: var(--ease-slow); }
 
 .leaf.is-entered [data-fx="rise"], .leaf.is-entered [data-fx="fade"], .leaf.is-entered [data-fx="drop"],
-.leaf.is-entered [data-fx="draw"], .leaf.is-entered [data-fx="draw-dot"], .leaf.is-entered [data-fx="draw-line"],
-.leaf.is-entered [data-fx="wipe"] { opacity: 1; translate: none; rotate: none; scale: none; filter: none; }
+.leaf.is-entered [data-fx="draw"], .leaf.is-entered [data-fx="draw-dot"], .leaf.is-entered [data-fx="draw-line"] { opacity: 1; translate: none; rotate: none; scale: none; filter: none; }
 
 /* Words rise out of a mask, one after another. */
 .mw { display: inline-block; overflow: hidden; vertical-align: top; padding-bottom: 0.16em; margin-bottom: -0.16em; }
@@ -801,13 +880,9 @@ img { display: block; max-width: 100%; }
 }
 .leaf.is-entered .mw__in { transform: none; }
 
-/* The signature is written on: a strip of paper slides away from it. */
-.note__signature[data-fx="wipe"]::after {
-  content: ""; position: absolute; inset: -4px -6px; background: var(--ivory);
-  transform-origin: 100% 50%;
-  transition: transform var(--t0) var(--ease-slow); transition-delay: var(--dly);
-}
-.leaf.is-entered .note__signature[data-fx="wipe"]::after { transform: scaleX(0); }
+/* Handwriting is written on, left to right. */
+.leaf [data-fx="wipe"] { clip-path: inset(-0.3em 100% -0.3em -0.2em); transition: clip-path var(--t0) var(--ease-slow); transition-delay: var(--dly); }
+.leaf.is-entered [data-fx="wipe"] { clip-path: inset(-0.3em -0.4em -0.3em -0.2em); }
 
 /* Photographs: a curtain of paper lifts, the picture settles from a gentle zoom,
    and a band of light crosses it once. */
@@ -825,6 +900,12 @@ img { display: block; max-width: 100%; }
 }
 .photo[data-reveal="left"] .photo__veil { transform-origin: 0 50%; }
 .photo[data-reveal="fade"] .photo__veil { display: none; }
+.photo[data-reveal="develop"] .photo__veil {          /* a print slowly developing out of darkness */
+  background-color: #1b110e; transform: none;
+  transition: opacity calc(var(--t, 1500ms) * var(--tk)) cubic-bezier(0.4, 0, 0.3, 1);
+  transition-delay: calc(var(--base) + var(--rd, 0ms) + var(--d, 0ms));
+}
+.leaf.is-entered .photo[data-reveal="develop"] .photo__veil { opacity: 0; }
 .leaf.is-entered .photo[data-reveal="up"] .photo__veil { transform: scaleY(0); }
 .leaf.is-entered .photo[data-reveal="left"] .photo__veil { transform: scaleX(0); }
 .photo__sheen {
@@ -836,15 +917,6 @@ img { display: block; max-width: 100%; }
 }
 .leaf.is-entered .photo__sheen { transform: translate3d(260%, 0, 0) skewX(-14deg); }
 
-/* Photo corners snap on a beat after their print has landed. */
-.photo--print::before, .photo--print::after {
-  scale: 0; transform-origin: 0 0;
-  transition: scale 420ms var(--ease-soft);
-  transition-delay: calc(var(--base) + var(--d, 0ms) + var(--t, 1300ms) * var(--tk) * 0.8);
-}
-.photo--print::after { transform-origin: 100% 100%; }
-.leaf.is-entered .photo--print::before, .leaf.is-entered .photo--print::after { scale: 1; }
-
 /* Title & chapter keylines settle in; the closing page gathers a warm glow. */
 .page--title::before, .page--chapter::before {
   opacity: 0; scale: 1.05;
@@ -853,7 +925,7 @@ img { display: block; max-width: 100%; }
 }
 .leaf.is-entered .page--title::before, .leaf.is-entered .page--chapter::before { opacity: 1; scale: 1; }
 
-.page--closing::before, .page--chapter::after {
+.page--closing::before, .page--reveal::before, .page--chapter::after {
   content: ""; position: absolute; inset: 0; pointer-events: none;
   background: radial-gradient(62% 46% at 50% 44%, rgba(214, 170, 110, 0.3), rgba(214, 170, 110, 0) 72%);
   opacity: 0; scale: 0.82;
@@ -861,7 +933,7 @@ img { display: block; max-width: 100%; }
   transition-delay: 500ms;
 }
 .page--chapter::after { background: radial-gradient(50% 36% at 50% 38%, rgba(214, 170, 110, 0.2), rgba(214, 170, 110, 0) 72%); }
-.leaf.is-entered .page--closing::before, .leaf.is-entered .page--chapter::after { opacity: 1; scale: 1.06; }
+.leaf.is-entered .page--closing::before, .leaf.is-entered .page--reveal::before, .leaf.is-entered .page--chapter::after { opacity: 1; scale: 1.06; }
 
 /* The sprig draws itself, then its leaves fill in. */
 .leaf.is-entered .sprig path {
@@ -873,31 +945,11 @@ img { display: block; max-width: 100%; }
   transition-delay: calc(var(--base) + var(--d, 0ms) + var(--pi, 0) * 280ms), calc(var(--base) + var(--d, 0ms) + 2200ms);
 }
 
-/* -- Timeline (strip) --------------------------------------------------- */
-.strip__line {
-  position: absolute; z-index: 1; left: calc(-1 * var(--gut) - 6px); top: 5%; bottom: 5%; width: 1px;
-  background: var(--gold);
-}
-.strip__node {
-  position: absolute; z-index: 2; top: 50%; left: calc(-1 * var(--gut) - 9.5px);
-  width: 8px; height: 8px; margin-top: -4px; border-radius: 50%;
-  background: var(--ivory); border: 1px solid var(--gold);
-  transition-delay: calc(var(--base) + var(--rd, 0ms)) !important;
-}
-.strip__row::before {
-  transform-origin: 0 50%; scale: 0 1;
-  transition: scale calc(1100ms * var(--tk)) var(--ease-slow);
-  transition-delay: calc(var(--base) + var(--rd, 0ms));
-}
-.leaf.is-entered .strip__row::before { scale: 1; }
-
 /* -- Idle motion: only on the page being looked at -------------------- */
 .leaf.is-current.is-entered .photo__reveal {
   animation: drift 28s ease-in-out infinite alternate;
   animation-delay: calc(var(--base) + var(--rd, 0ms) + var(--d, 0ms) + var(--t, 1500ms) * var(--tk) * 1.7);
 }
-.leaf.is-current.is-entered .mosaic__b .photo__reveal { animation-duration: 21s; animation-direction: alternate-reverse; }
-.leaf.is-current.is-entered .mosaic__c .photo__reveal { animation-duration: 24s; }
 @keyframes drift {
   from { transform: translate3d(0, 0, 0) scale(1); }
   to   { transform: translate3d(var(--drift-x), var(--drift-y), 0) scale(calc(1 + var(--drift-s))); }
@@ -918,7 +970,7 @@ img { display: block; max-width: 100%; }
 }
 @keyframes ripple { from { transform: scale(1); opacity: 0.7; } to { transform: scale(3.2); opacity: 0; } }
 
-.leaf.is-current.is-entered .page--closing::before { animation: glow 11s ease-in-out infinite alternate; animation-delay: 7.5s; }
+.leaf.is-current.is-entered .page--closing::before, .leaf.is-current.is-entered .page--reveal::before { animation: glow 11s ease-in-out infinite alternate; animation-delay: 7.5s; }
 @keyframes glow { from { opacity: 1; } to { opacity: 0.7; } }
 
 /* Paper: the page breathes against its binding, and settles when it lands. */
@@ -1015,18 +1067,18 @@ img { display: block; max-width: 100%; }
 :root[data-reduced] .leaf [data-fx="words"] { opacity: 1; }
 :root[data-reduced] .mw__in { transform: none !important; opacity: 0; transition: opacity 600ms ease !important; transition-delay: 120ms !important; }
 :root[data-reduced] .leaf.is-entered .mw__in { opacity: 1; }
-:root[data-reduced] .photo__veil, :root[data-reduced] .photo__sheen,
+:root[data-reduced] .photo__sheen, :root[data-reduced] .photo[data-reveal="up"] .photo__veil, :root[data-reduced] .photo[data-reveal="left"] .photo__veil,
 :root[data-reduced] .fx-canvas, :root[data-reduced] .fx-grain::before,
 :root[data-reduced] .note__spark, :root[data-reduced] .note__sprig { display: none !important; }
 :root[data-reduced] .photo__reveal, :root[data-reduced] .page::before, :root[data-reduced] .page::after,
-:root[data-reduced] .photo--print::before, :root[data-reduced] .photo--print::after,
-:root[data-reduced] .strip__row::before {
+:root[data-reduced] .tl__row::before, :root[data-reduced] .list__item::after {
   scale: none !important; transition: none !important;
 }
 :root[data-reduced] .page--title::before, :root[data-reduced] .page--chapter::before { opacity: 1; scale: none; }
-:root[data-reduced] .page--closing::before, :root[data-reduced] .page--chapter::after { opacity: 1; scale: none; animation: none !important; }
-:root[data-reduced] .note__signature[data-fx="wipe"]::after { display: none; }
-:root[data-reduced] .strip__line, :root[data-reduced] .strip__node { display: none; }
+:root[data-reduced] .page--closing::before, :root[data-reduced] .page--reveal::before, :root[data-reduced] .page--chapter::after { opacity: 1; scale: none; animation: none !important; }
+:root[data-reduced] .leaf [data-fx="wipe"] { clip-path: none !important; }
+:root[data-reduced] .tl__line, :root[data-reduced] .tl__node { display: none; }
+:root[data-reduced] .slot { transition-duration: 1ms !important; }
 :root[data-reduced] .leaf *, :root[data-reduced] .leaf *::before, :root[data-reduced] .leaf *::after,
 :root[data-reduced] .fx-light__blob, :root[data-reduced] .leaf__face { animation: none !important; }
 :root[data-reduced] .photo__reveal { inset: 0; }

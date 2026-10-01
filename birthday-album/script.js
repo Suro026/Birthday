@@ -11,6 +11,7 @@
      5. Book engine        leaves, page-turn physics, painting (transform/opacity only)
      6. Album controller   single source of truth: current page + events
      7. Motion             entrances, particle fields, pointer parallax, landing settle
+     7b Memories           tap a photograph: lift + caption slip
      8. Input              keyboard, gestures (touch/pen/mouse), wheel, hot-spots
      9. Music              optional background track
     10. Boot               wires everything together
@@ -93,6 +94,9 @@
   /** Resolve a file name against a base folder; leave absolute URLs alone. */
   function resolveAsset(file, base) {
     if (!file) return '';
+    // "/assets/photos/x.webp" is read as relative to the album, so it works when
+    // the site is served from a sub-folder (GitHub Pages) as well as from a root.
+    if (/^\/assets\//.test(file)) return file.slice(1);
     return /^([a-z][a-z0-9+.-]*:|\/)/i.test(file) ? file : base + file;
   }
 
@@ -196,6 +200,13 @@
         Compositions are sized with container-query units in style.css, so the
         same markup scales from a 320px phone to a desktop.
 
+        Photographs are described by a "memory":
+          { image, srcset, full, ratio, caption, date, description, alt, focus,
+            position: { x, y, w }, rotation, tape }
+        A layout supplies sensible default positions and tilts; anything in
+        the config overrides them. Tapping a photograph lifts it slightly and
+        reveals its caption, date and description on a paper slip.
+
         Motion is authored here as data, not code: fx(el, kind, delay, time)
         tags an element for the entrance choreography (see "Motion" in
         style.css). Delays are in ms from the moment the page is revealed, so
@@ -203,7 +214,7 @@
      ------------------------------------------------------------------------ */
   const text = (tag, cls, value) => (value ? h(tag, { class: cls, text: value }) : null);
 
-  /** Tag an element for the entrance choreography. kinds: rise | fade | drop | draw | words */
+  /** Tag an element for the entrance choreography. kinds: rise | fade | drop | draw | wipe | words */
   function fx(el, kind, delay = 0, time = 0) {
     if (!el) return el;
     el.dataset.fx = kind;
@@ -226,34 +237,93 @@
     return fx(el, 'words', delay, time);
   }
 
-  /** Normalise `photo` / `photos` into an array of exactly `count` photo specs. */
-  function photosOf(spec, count) {
-    let list = Array.isArray(spec.photos) ? spec.photos : spec.photo ? [spec] : [];
-    list = list.map((p) => (typeof p === 'string' ? { photo: p } : p || {}));
-    while (list.length < count) list.push({});
-    return list.slice(0, count);
+  /** Handwritten text that is written on, left to right. */
+  const hand = (tag, cls, value, delay, time = 1500) => fx(text(tag, `hand ${cls}`, value), 'wipe', delay, time);
+
+  /* ---- memories ---- */
+
+  /** "photo-01.webp" -> assets/photos/photo-01.webp; "/assets/…" works from any sub-folder too. */
+  function assetUrl(file, cfg) {
+    return resolveAsset(file, cfg.base.photos);
+  }
+
+  /** srcset string with every URL resolved: "a-480.webp 480w, a-960.webp 960w". */
+  function srcsetUrl(value, cfg) {
+    if (!value) return '';
+    return String(value).split(',').map((part) => {
+      const [url, ...rest] = part.trim().split(/\s+/);
+      return [assetUrl(url, cfg), ...rest].join(' ');
+    }).join(', ');
+  }
+
+  const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+
+  /**
+   * Normalise any photo description into one memory object.
+   *   raw     string (an image path) or an object from config.js
+   *   preset  the layout's defaults for this slot
+   *   page    page-level spec, used to fill gaps (single-photo layouts)
+   */
+  function memoryOf(raw, preset = {}, page = {}) {
+    const src = typeof raw === 'string' ? { image: raw } : (isObj(raw) ? raw : {});
+    const pos = { ...preset, ...(isObj(src.position) ? src.position : {}) };
+    return {
+      image: src.image || src.photo || '',
+      srcset: src.srcset || '',
+      full: src.full || '',
+      ratio: src.ratio || preset.ratio || '4/5',
+      alt: src.alt || '',
+      caption: src.caption ?? page.caption ?? '',
+      date: src.date ?? page.date ?? '',
+      description: src.description ?? page.description ?? '',
+      focus: src.focus || '',
+      x: pos.x, y: pos.y, w: pos.w,
+      rotation: src.rotation ?? preset.rotation ?? 0,
+      tape: src.tape ?? preset.tape ?? '',
+    };
+  }
+
+  /** The first photograph of a single-photo page. */
+  function firstMemory(spec, preset) {
+    const raw = Array.isArray(spec.photos) ? spec.photos[0] : spec.photo ?? spec.image;
+    return memoryOf(raw, preset, spec);
+  }
+
+  /** Photos of a multi-photo page, padded with empty slots so placeholders still show. */
+  function memoriesOf(spec, presets) {
+    const list = Array.isArray(spec.photos) ? spec.photos : [];
+    return presets.map((preset, i) => memoryOf(list[i], preset, {}));
   }
 
   /**
-   * A framed photograph. Returns { el, img }.
-   *   opts.kind    entrance of the whole frame: 'rise' | 'drop' | 'fade' | ''
-   *   opts.reveal  how the picture itself is uncovered: 'up' | 'left' | 'fade'
+   * A photograph as a printed object. Returns { el, img }.
+   *   opts.frame   'mat' | 'polaroid' | 'bleed' | 'frame'
+   *   opts.kind    entrance of the whole print: 'rise' | 'drop' | 'fade' | ''
+   *   opts.reveal  how the picture itself is uncovered: 'up' | 'left' | 'fade' | 'develop'
    *   opts.delay / opts.time   storyboard timing (ms)
    *   opts.depth   parallax strength while the page turns (% of image width)
    *   opts.pointer desktop pointer parallax in px (0 = none)
    *   opts.sway    gentle idle rotation (a print resting loosely on the page)
+   *   opts.sizes   the `sizes` attribute for responsive images
    */
-  function photoFigure(photo, ctx, modifier = '', opts = {}) {
-    const { kind = '', reveal = 'fade', delay = 0, time = 1500, depth = 3, pointer = 0, sway = false } = opts;
+  function photoFigure(mem, ctx, opts = {}) {
+    const { frame = 'mat', kind = '', reveal = 'fade', delay = 0, time = 1500, depth = 3, pointer = 0, sway = false, sizes = '' } = opts;
     const n = ctx.photo();
     const img = h('img', {
       class: 'photo__img',
-      alt: photo.alt || photo.caption || '',
+      alt: mem.alt || mem.caption || '',
       decoding: 'async',
+      loading: 'lazy',
       draggable: 'false',
-      dataset: { src: resolveAsset(photo.photo, ctx.cfg.base.photos), depth: String(depth), zoom: '1.08' },
+      dataset: {
+        src: assetUrl(mem.image, ctx.cfg),
+        srcset: srcsetUrl(mem.srcset, ctx.cfg),
+        sizes,
+        depth: String(depth),
+        zoom: '1.08',
+      },
     });
-    if (photo.focus) img.style.objectPosition = photo.focus;
+    if (mem.focus) img.style.objectPosition = mem.focus;
     const stage = h('div', { class: 'photo__reveal' }, [
       img,
       h('div', { class: 'photo__missing', 'aria-hidden': 'true' }, [
@@ -263,20 +333,68 @@
     ]);
     if (pointer) stage.dataset.pointer = String(pointer);
     const el = h('figure', {
-      class: `photo ${modifier}`.trim(),
-      dataset: { tone: String(n % 3), reveal, sway: sway ? '' : null },
+      class: `photo photo--${frame}`,
+      dataset: { tone: String(n % 3), reveal },
     }, [
       h('div', { class: 'photo__well' }, [
         stage,
         h('span', { class: 'photo__sheen', 'aria-hidden': 'true' }),
         h('span', { class: 'photo__veil', 'aria-hidden': 'true' }),
       ]),
+      frame === 'polaroid' && mem.caption ? h('figcaption', { class: 'photo__chin hand', text: mem.caption }) : null,
+      frame === 'polaroid' || frame === 'mat' ? h('span', { class: 'photo__paper', 'aria-hidden': 'true' }) : null,
     ]);
+    if (sway) el.dataset.sway = '';
     el.style.setProperty('--d', `${delay}ms`);
     el.style.setProperty('--t', `${time}ms`);
     if (kind) el.dataset.fx = kind;
     return { el, img };
   }
+
+  /**
+   * Places a print on the page and makes it tappable.
+   *   flow   true = take part in normal layout; false = absolutely positioned by x/y/w
+   *   tapes  strips of tape holding it down ('top', 'corner', 'both' or '')
+   */
+  function printSlot(mem, ctx, figOpts, { flow = false, interactive = true, tapeDelay = 900, lift = 1.07 } = {}) {
+    const fig = photoFigure(mem, ctx, figOpts);
+    const [a, b] = String(mem.ratio).split('/').map(Number);
+    const slot = h('div', { class: `slot${flow ? ' slot--flow' : ''}` }, [fig.el]);
+    slot.style.setProperty('--tilt', `${mem.rotation || 0}deg`);
+    slot.style.setProperty('--open-zoom', String(lift));
+    slot.style.aspectRatio = `${a || 4} / ${b || 5}`;
+    if (!flow && mem.w != null) {
+      slot.style.left = `${mem.x}%`;
+      slot.style.top = `${mem.y}%`;
+      slot.style.width = `${mem.w}%`;
+    }
+    for (const kind of mem.tape === 'both' ? ['top', 'corner'] : mem.tape ? [mem.tape] : []) {
+      slot.append(fx(h('span', { class: `tape tape--${kind}`, 'aria-hidden': 'true' }), 'fade', tapeDelay, 700));
+    }
+    const hasText = mem.caption || mem.description || mem.date;
+    if (interactive && hasText) {
+      Object.assign(slot.dataset, {
+        memory: '',
+        caption: mem.caption,
+        date: mem.date ? formatDate(mem.date, ctx.cfg.site.language) : '',
+        description: mem.description,
+        full: mem.full ? assetUrl(mem.full, ctx.cfg) : '',
+      });
+      slot.setAttribute('role', 'button');
+      slot.setAttribute('tabindex', '0');
+      slot.setAttribute('aria-expanded', 'false');
+      slot.setAttribute('aria-label', mem.alt || mem.caption || ctx.cfg.ui.photograph);
+    }
+    return { el: slot, img: fig.img };
+  }
+
+  /** The paper slip that carries the caption, date and description of the open photograph. */
+  const memoSlip = () => h('div', { class: 'memo', 'aria-live': 'polite' }, [
+    h('span', { class: 'tape tape--top', 'aria-hidden': 'true' }),
+    h('p', { class: 'eyebrow memo__date' }),
+    h('p', { class: 'hand memo__cap' }),
+    h('p', { class: 'memo__desc' }),
+  ]);
 
   const metaLine = (ctx, date) =>
     h('p', { class: 'eyebrow meta' }, [
@@ -312,9 +430,217 @@
     return svg;
   }
 
+  /* Default placement of each print, in % of the page (x, y = top-left, w = width),
+     with a slight tilt. Overridden by `position` / `rotation` in config.js. */
+  const PRESETS = {
+    collage: [
+      { x: 12, y: 5,  w: 52, ratio: '4/5', rotation: -2.2, tape: 'top' },
+      { x: 57, y: 13, w: 33, ratio: '1/1', rotation: 3.1,  tape: 'corner' },
+      { x: 14, y: 52, w: 40, ratio: '5/4', rotation: 1.6 },
+      { x: 52, y: 44, w: 38, ratio: '4/5', rotation: -2.8, tape: 'top' },
+      { x: 32, y: 71, w: 30, ratio: '1/1', rotation: 2.4,  tape: 'corner' },
+    ],
+    polaroids: [
+      { x: 11, y: 6,  w: 45, ratio: '5/6', rotation: -3.2, tape: 'top' },
+      { x: 51, y: 14, w: 41, ratio: '5/6', rotation: 2.6 },
+      { x: 9,  y: 47, w: 40, ratio: '5/6', rotation: 1.8,  tape: 'corner' },
+      { x: 47, y: 52, w: 43, ratio: '5/6', rotation: -2.1, tape: 'top' },
+    ],
+    interactive: [
+      { x: 14, y: 14, w: 32, ratio: '4/5', rotation: -3 },
+      { x: 54, y: 12, w: 30, ratio: '4/5', rotation: 2.4 },
+      { x: 12, y: 39, w: 30, ratio: '4/5', rotation: 2 },
+      { x: 52, y: 37, w: 34, ratio: '4/5', rotation: -2.5 },
+      { x: 16, y: 61, w: 32, ratio: '4/5', rotation: -1.4 },
+      { x: 56, y: 60, w: 28, ratio: '4/5', rotation: 3 },
+    ],
+  };
+
   const LAYOUTS = {
-    /* Cover plate. The keyline settles in, the name rises from a mask, then the
-       rest follows — slow, with gold dust drifting in the light. */
+    /* 1 · Opening memory: one large print, taped down, with her name above and
+       a handwritten line below. The picture is uncovered slowly. */
+    opening(spec, ctx) {
+      const mem = firstMemory(spec, { ratio: '4/5', rotation: -1.8, tape: 'top' });
+      const slot = printSlot(mem, ctx,
+        { frame: 'mat', kind: 'fade', reveal: 'up', time: 2400, depth: 5, pointer: 10, sizes: '(min-width: 768px) 40vw, 80vw' },
+        { flow: true, tapeDelay: 1700, lift: 1.05 });
+      const el = h('div', { class: 'page page--opening' }, [
+        h('div', { class: 'opening__head' }, [
+          fx(text('p', 'eyebrow', spec.eyebrow), 'fade', 200, 1100),
+          words('h2', 'opening__name', spec.title || ctx.cfg.recipient.name, 450, 1500),
+        ]),
+        h('div', { class: 'opening__print' }, [slot.el]),
+        h('div', { class: 'opening__foot' }, [
+          hand('p', 'opening__caption', mem.caption, 2300, 1700),
+          fx(text('p', 'eyebrow eyebrow--quiet', mem.date ? formatDate(mem.date, ctx.cfg.site.language) : ''), 'fade', 2900, 1200),
+        ]),
+        memoSlip(),
+      ]);
+      return result('opening', { title: spec.title || ctx.cfg.recipient.name, caption: mem.caption }, el, [slot.img]);
+    },
+
+    /* 2 · Photo collage: five prints laid down one by one, overlapping a little. */
+    collage(spec, ctx) {
+      const mems = memoriesOf(spec, PRESETS.collage);
+      const slots = mems.map((mem, i) => {
+        const s = printSlot(mem, ctx, {
+          frame: i % 3 === 2 ? 'frame' : 'mat', kind: 'drop', reveal: 'fade',
+          delay: i * 480, time: 1300, depth: [3, 6, 4, 7, 5][i], sway: i % 2 === 1, sizes: '(min-width: 768px) 28vw, 52vw',
+        }, { tapeDelay: i * 480 + 1000 });
+        s.el.style.setProperty('--z', String(i + 1));
+        s.el.firstChild.style.setProperty('--fx-r', `${(i % 2 ? 1 : -1) * 4}deg`);
+        s.el.firstChild.style.setProperty('--sway-delay', `${i * 1.1}s`);
+        return s;
+      });
+      const el = h('div', { class: 'page page--collage' }, [...slots.map((s) => s.el), memoSlip()]);
+      return result('collage', spec, el, slots.map((s) => s.img));
+    },
+
+    /* 3 · Full-screen-style photograph: the picture is the page. A curtain lifts,
+       it settles from a slow push-in; tap for the caption. */
+    full(spec, ctx) {
+      const mem = firstMemory(spec, { ratio: '3/4' });
+      const slot = printSlot(mem, ctx,
+        { frame: 'bleed', reveal: 'up', time: 2800, depth: 4, pointer: 9, sizes: '(min-width: 768px) 50vw, 100vw' },
+        { flow: true, lift: 1 });
+      const el = h('div', { class: 'page page--full' }, [
+        slot.el,
+        h('div', { class: 'full__label' }, [
+          fx(metaLine(ctx, mem.date), 'fade', 1700, 1300),
+          words('h2', 'full__title', spec.title, 1900, 1300),
+        ]),
+        h('span', { class: 'full__scrim', 'aria-hidden': 'true' }),
+        memoSlip(),
+      ]);
+      return result('full', { title: spec.title, caption: mem.caption }, el, [slot.img]);
+    },
+
+    /* 4 · Little things I love about you: a handwritten list, set down line by line. */
+    list(spec, ctx) {
+      const items = [].concat(spec.items || []).filter(Boolean);
+      const mem = spec.photo || spec.photos ? firstMemory(spec, { ratio: '4/5', rotation: 3, tape: 'corner' }) : null;
+      const photo = mem ? printSlot(mem, ctx,
+        { frame: 'mat', kind: 'drop', reveal: 'fade', delay: 1100, time: 1300, depth: 5, sway: true, sizes: '(min-width: 768px) 24vw, 40vw' },
+        { flow: true, tapeDelay: 2000 }) : null;
+      const el = h('div', { class: 'page page--list' }, [
+        h('div', { class: 'list__head' }, [
+          fx(text('p', 'eyebrow', spec.eyebrow), 'fade', 150, 1000),
+          words('h2', 'list__title', spec.heading, 300, 1300),
+        ]),
+        h('ol', { class: 'list__items' }, items.map((item, i) => {
+          const li = h('li', { class: 'list__item' }, [
+            h('span', { class: 'list__num', 'aria-hidden': 'true', text: pad2(i + 1) }),
+            h('span', { class: 'list__text', text: typeof item === 'string' ? item : item.text }),
+          ]);
+          li.style.setProperty('--rd', `${900 + i * 560}ms`);
+          fx(li, 'rise', 0, 1100);
+          li.dataset.line = '';
+          return li;
+        })),
+        photo ? h('div', { class: 'list__photo' }, [photo.el]) : null,
+        memoSlip(),
+      ]);
+      return result('list', { heading: spec.heading }, el, photo ? [photo.img] : []);
+    },
+
+    /* 5 · Timeline: a gold line grows down the page; each moment is set against it in turn. */
+    timeline(spec, ctx) {
+      const entries = memoriesOf(spec, [0, 1, 2, 3].map((i) => ({ ratio: '1/1', rotation: [-2, 1.6, -1.2, 2.2][i] })));
+      const rows = entries.map((mem, i) => {
+        const s = printSlot(mem, ctx,
+          { frame: 'mat', reveal: 'left', time: 1200, delay: 160, depth: 4, sizes: '(min-width: 768px) 20vw, 30vw' },
+          { flow: true, tapeDelay: 99999, lift: 1.1 });
+        const date = mem.date ? formatDate(mem.date, ctx.cfg.site.language) : '';
+        const row = h('div', { class: 'tl__row' }, [
+          fx(h('span', { class: 'tl__node', 'aria-hidden': 'true' }), 'draw-dot', 0, 700),
+          s.el,
+          h('div', { class: 'tl__text' }, [
+            date ? fx(h('p', { class: 'eyebrow', text: date }), 'fade', 420, 1000) : null,
+            hand('p', 'tl__caption', mem.caption, 560, 1300),
+          ]),
+        ]);
+        row.style.setProperty('--rd', `${900 + i * 850}ms`);
+        return { row, img: s.img };
+      });
+      const el = h('div', { class: 'page page--timeline' }, [
+        h('div', { class: 'tl__head' }, [
+          fx(metaLine(ctx), 'fade', 100, 1000),
+          words('h2', 'tl__heading', spec.heading, 250, 1200),
+        ]),
+        h('div', { class: 'tl__rows' }, [
+          fx(h('span', { class: 'tl__line', 'aria-hidden': 'true' }), 'draw-line', 700, 3400),
+          ...rows.map((r) => r.row),
+        ]),
+        memoSlip(),
+      ]);
+      return result('timeline', { heading: spec.heading }, el, rows.map((r) => r.img));
+    },
+
+    /* 6 · Polaroids: instant prints with the caption written on the white border. */
+    polaroids(spec, ctx) {
+      const mems = memoriesOf(spec, PRESETS.polaroids);
+      const slots = mems.map((mem, i) => {
+        const s = printSlot(mem, ctx, {
+          frame: 'polaroid', kind: 'drop', reveal: 'develop',
+          delay: i * 650, time: 1500, depth: [4, 6, 3, 5][i], sway: i % 2 === 0, sizes: '(min-width: 768px) 24vw, 42vw',
+        }, { tapeDelay: i * 650 + 1100 });
+        s.el.style.setProperty('--z', String(i + 1));
+        s.el.firstChild.style.setProperty('--fx-r', `${(i % 2 ? 1 : -1) * 5}deg`);
+        s.el.firstChild.style.setProperty('--sway-delay', `${i * 1.4}s`);
+        return s;
+      });
+      const el = h('div', { class: 'page page--polaroids' }, [...slots.map((s) => s.el), memoSlip()]);
+      return result('polaroids', spec, el, slots.map((s) => s.img));
+    },
+
+    /* 7 · Interactive memory: a loose pile of small prints. Tap one and it comes
+       forward while the rest step back. */
+    interactive(spec, ctx) {
+      const mems = memoriesOf(spec, PRESETS.interactive);
+      const slots = mems.map((mem, i) => {
+        const s = printSlot(mem, ctx, {
+          frame: 'mat', kind: 'drop', reveal: 'fade',
+          delay: 700 + i * 380, time: 1100, depth: 4, sway: i % 2 === 0, sizes: '(min-width: 768px) 20vw, 34vw',
+        }, { tapeDelay: 99999, lift: 1 });
+        s.el.style.setProperty('--z', String(i + 1));
+        s.el.firstChild.style.setProperty('--fx-r', `${(i % 2 ? 1 : -1) * 4}deg`);
+        s.el.firstChild.style.setProperty('--sway-delay', `${i * 0.9}s`);
+        return s;
+      });
+      const el = h('div', { class: 'page page--interactive', dataset: { mode: 'lift' } }, [
+        hand('p', 'interactive__title', spec.heading, 150, 1500),
+        ...slots.map((s) => s.el),
+        fx(text('p', 'interactive__hint eyebrow', spec.hint), 'fade', 3200, 1400),
+        memoSlip(),
+      ]);
+      return result('interactive', { heading: spec.heading }, el, slots.map((s) => s.img));
+    },
+
+    /* 8 · Final reveal: from near darkness a single print slowly develops. */
+    reveal(spec, ctx) {
+      const mem = firstMemory(spec, { ratio: '4/5', rotation: -1.6, tape: 'top' });
+      const slot = printSlot(mem, ctx,
+        { frame: 'mat', kind: 'fade', reveal: 'develop', delay: 1800, time: 6500, depth: 4, sizes: '(min-width: 768px) 36vw, 64vw' },
+        { flow: true, tapeDelay: 7600, lift: 1.05 });
+      const el = h('div', { class: 'page page--reveal' }, [
+        words('h2', 'reveal__heading', spec.heading, 900, 2400),
+        h('div', { class: 'reveal__print' }, [slot.el]),
+        h('div', { class: 'reveal__foot' }, [
+          hand('p', 'reveal__line', spec.text || mem.caption, 8200, 2200),
+          spec.restartLabel
+            ? fx(h('button', { class: 'btn btn--onwine', type: 'button', dataset: { action: 'restart' } }, [
+                h('span', { text: spec.restartLabel }),
+              ]), 'fade', 10500, 2000)
+            : null,
+        ]),
+        memoSlip(),
+      ]);
+      return result('reveal', { title: spec.heading, caption: mem.caption }, el, [slot.img], 'wine-deep');
+    },
+
+    /* ---- simple typographic pages, kept for flexibility ---- */
+
+    /* Cover plate. */
     title(spec, ctx) {
       const { cfg } = ctx;
       const date = spec.showDate === false ? '' : formatDate(cfg.birthday.date, cfg.site.language);
@@ -330,129 +656,8 @@
       return { ...result('title', { title: cfg.recipient.name }, el), imgs: [] };
     },
 
-    /* Photograph to the edges: a slow curtain lifts off the picture while it
-       settles from a long, gentle zoom; light crosses it once. */
-    full(spec, ctx) {
-      const [p] = photosOf(spec, 1);
-      const fig = photoFigure({ ...p, caption: spec.caption }, ctx, 'photo--bleed',
-        { reveal: 'up', time: 2600, depth: 4, pointer: 9 });
-      const el = h('div', { class: 'page page--full' }, [
-        fig.el,
-        h('div', { class: 'full__text' }, [
-          fx(metaLine(ctx, spec.date), 'fade', 1500, 1200),
-          words('h2', 'page__title', spec.title, 1700, 1300),
-          fx(text('p', 'page__caption', spec.caption), 'rise', 2100, 1400),
-        ]),
-      ]);
-      return result('full', spec, el, [fig.img]);
-    },
-
-    /* One large print. It arrives softly, then drifts; the picture moves a
-       little against its mat as the page turns and (on desktop) with the pointer. */
-    single(spec, ctx) {
-      const [p] = photosOf(spec, 1);
-      const fig = photoFigure({ ...p, caption: spec.caption }, ctx, 'photo--mat',
-        { kind: 'fade', reveal: 'fade', time: 1900, depth: 5, pointer: 12 });
-      const el = h('div', { class: 'page page--single' }, [
-        fx(metaLine(ctx, spec.date), 'fade', 200, 1100),
-        fig.el,
-        h('div', { class: 'single__text' }, [
-          words('h2', 'page__title', spec.title, 1100, 1200),
-          fx(text('p', 'page__caption', spec.caption), 'rise', 1500, 1300),
-        ]),
-      ]);
-      return result('single', spec, el, [fig.img]);
-    },
-
-    /* Collage: the large print is laid down, then the small one lands on it. */
-    duo(spec, ctx) {
-      const [a, b] = photosOf(spec, 2);
-      const fa = photoFigure(a, ctx, 'photo--mat duo__a', { kind: 'drop', reveal: 'fade', delay: 0, time: 1500, depth: 3 });
-      const fb = photoFigure(b, ctx, 'photo--mat duo__b', { kind: 'drop', reveal: 'fade', delay: 650, time: 1300, depth: 7, sway: true });
-      fa.el.style.setProperty('--fx-r', '-2.5deg');
-      fb.el.style.setProperty('--fx-r', '5deg');
-      fb.el.style.setProperty('--fx-x', '22px');
-      const el = h('div', { class: 'page page--duo' }, [
-        fa.el,
-        fb.el,
-        h('div', { class: 'duo__text' }, [
-          fx(metaLine(ctx, spec.date), 'fade', 1500, 1100),
-          words('h2', 'page__title', spec.title, 1650, 1200),
-          fx(text('p', 'page__caption', spec.caption), 'rise', 2000, 1300),
-        ]),
-      ]);
-      return result('duo', spec, el, [fa.img, fb.img]);
-    },
-
-    /* Prints are placed one at a time; each corner snaps on a beat later. */
-    corners(spec, ctx) {
-      const timing = [0, 520, 1040];
-      const tilt = ['-3deg', '4deg', '-2deg'];
-      const prints = photosOf(spec, 3).map((p, i) => {
-        const f = photoFigure(p, ctx, `photo--print print--${i + 1}`,
-          { kind: 'drop', reveal: 'fade', delay: timing[i], time: 1300, depth: [3, 6, 4][i], sway: true });
-        f.el.style.setProperty('--fx-r', tilt[i]);
-        f.el.style.setProperty('--sway-delay', `${i * 1.3}s`);
-        return f;
-      });
-      const el = h('div', { class: 'page page--corners' }, [
-        ...prints.map((f) => f.el),
-        h('div', { class: 'corners__text' }, [
-          fx(metaLine(ctx, spec.date), 'fade', 1700, 1100),
-          words('h2', 'page__title', spec.title, 1850, 1200),
-        ]),
-      ]);
-      return result('corners', spec, el, prints.map((f) => f.img));
-    },
-
-    /* A timeline: a gold line grows down the page and each frame, with its
-       date and caption, is set against it in turn. */
-    strip(spec, ctx) {
-      const rows = photosOf(spec, 3).map((p, i) => {
-        const fig = photoFigure(p, ctx, 'photo--frame', { reveal: 'left', time: 1300, delay: 160, depth: 4 });
-        const row = h('div', { class: 'strip__row' }, [
-          fx(h('span', { class: 'strip__node', 'aria-hidden': 'true' }), 'draw-dot', 0, 700),
-          fig.el,
-          h('div', { class: 'strip__text' }, [
-            p.date ? fx(h('p', { class: 'eyebrow', text: formatDate(p.date, ctx.cfg.site.language) }), 'fade', 420, 1000) : null,
-            fx(text('p', 'page__caption', p.caption), 'rise', 560, 1200),
-          ]),
-        ]);
-        row.style.setProperty('--rd', `${900 + i * 900}ms`);
-        return { row, img: fig.img };
-      });
-      const el = h('div', { class: 'page page--strip' }, [
-        h('div', { class: 'strip__head' }, [
-          fx(metaLine(ctx), 'fade', 100, 1000),
-          words('h2', 'strip__heading', spec.heading, 250, 1200),
-        ]),
-        h('div', { class: 'strip__rows' }, [
-          fx(h('span', { class: 'strip__line', 'aria-hidden': 'true' }), 'draw-line', 700, 3000),
-          ...rows.map((r) => r.row),
-        ]),
-      ]);
-      return result('strip', spec, el, rows.map((r) => r.img));
-    },
-
-    /* The large photograph first, then the small memories one by one. */
-    mosaic(spec, ctx) {
-      const [a, b, c] = photosOf(spec, 3);
-      const fa = photoFigure(a, ctx, 'photo--frame mosaic__a', { reveal: 'up', time: 1700, depth: 4, pointer: 7 });
-      const fb = photoFigure(b, ctx, 'photo--frame mosaic__b', { kind: 'rise', reveal: 'left', delay: 800, time: 1200, depth: 6 });
-      const fc = photoFigure(c, ctx, 'photo--frame mosaic__c', { kind: 'rise', reveal: 'left', delay: 1350, time: 1200, depth: 6 });
-      const el = h('div', { class: 'page page--mosaic' }, [
-        fa.el, fb.el, fc.el,
-        h('div', { class: 'mosaic__text' }, [
-          fx(metaLine(ctx, spec.date), 'fade', 1900, 1100),
-          words('h2', 'page__title', spec.title, 2050, 1200),
-          fx(text('p', 'page__caption', spec.caption), 'rise', 2300, 1300),
-        ]),
-      ]);
-      return result('mosaic', spec, el, [fa.img, fb.img, fc.img]);
-    },
-
-    /* Wine divider: numeral, rule, title and caption arrive in sequence. */
-    chapter(spec, ctx) {
+    /* Wine divider. */
+    chapter(spec) {
       const el = h('div', { class: 'page page--chapter' }, [
         fx(text('p', 'chapter__numeral', spec.numeral), 'rise', 300, 1800),
         h('div', { class: 'chapter__text' }, [
@@ -464,9 +669,8 @@
       return result('chapter', spec, el, [], 'wine');
     },
 
-    /* The written message. Paragraphs arrive one at a time; the signature is
-       written on; a sprig draws itself. Tap the page for a small surprise. */
-    note(spec, ctx) {
+    /* The written message; tap the page for a small surprise. */
+    note(spec) {
       const paragraphs = [].concat(spec.paragraphs || []).filter(Boolean);
       const el = h('div', { class: 'page page--note' }, [
         fx(text('p', 'eyebrow', spec.heading), 'fade', 200, 1100),
@@ -475,7 +679,7 @@
         )),
         h('div', { class: 'note__sign' }, [
           fx(text('p', 'note__signoff', spec.signoff), 'fade', 600 + paragraphs.length * 1000, 1200),
-          h('p', { class: 'note__signature', 'data-fx': 'wipe', style: `--d:${900 + paragraphs.length * 1000}ms;--t:1700ms`, text: spec.signature || '' }),
+          hand('p', 'note__signature', spec.signature, 900 + paragraphs.length * 1000, 1700),
           fx(h('span', { class: 'note__spark', 'aria-hidden': 'true' }), 'fade', 3600 + paragraphs.length * 600, 1200),
         ]),
         h('div', { class: 'note__sprig', style: '--d:500ms', 'aria-hidden': 'true' }, [sprig()]),
@@ -483,8 +687,8 @@
       return result('note', spec, el);
     },
 
-    /* Last page: the slowest, quietest arrival in the book. */
-    closing(spec, ctx) {
+    /* Plain closing page. */
+    closing(spec) {
       const el = h('div', { class: 'page page--closing' }, [
         words('h2', 'closing__heading', spec.heading, 1700, 2400),
         fx(h('span', { class: 'rule', 'aria-hidden': 'true' }), 'draw', 3600, 2000),
@@ -504,8 +708,8 @@
     return cfg.pages.map((spec, i) => {
       let build = LAYOUTS[spec.layout];
       if (!build) {
-        console.warn(`[album] Unknown layout "${spec.layout}" on page ${i + 1}; using "single".`);
-        build = LAYOUTS.single;
+        console.warn(`[album] Unknown layout "${spec.layout}" on page ${i + 1}; using "opening".`);
+        build = LAYOUTS.opening;
       }
       return build(spec, { cfg, no: i + 1, photo: () => ++photoCount });
     });
@@ -517,8 +721,9 @@
         that is missing or fails to load shows an intentional placeholder plate
         instead of a broken-image icon.
      ------------------------------------------------------------------------ */
-  function loadImage(img) {
+  function loadImage(img, priority = 'auto') {
     if (img.dataset.state) return;
+    if (img.offsetParent === null && img.dataset.src) return; // hidden at this size (e.g. an optional photo): skip
     const frame = img.closest('.photo');
     const src = img.dataset.src;
     if (!src) {
@@ -535,6 +740,11 @@
       img.dataset.state = 'error';
       frame.classList.add('is-missing');
     }, { once: true });
+    img.fetchPriority = priority; // the page being read first, neighbours when idle
+    if (img.dataset.srcset) {
+      if (img.dataset.sizes) img.sizes = img.dataset.sizes;
+      img.srcset = img.dataset.srcset;
+    }
     img.src = src;
   }
 
@@ -769,6 +979,12 @@
     dom.counterTotal.textContent = pad2(total);
 
     /* ---- rendering ---- */
+    // Only the page being read (high priority) and its immediate neighbours are loaded.
+    function warm() {
+      const at = state.index;
+      for (let i = at - 1; i <= at + 1; i++) pages[i]?.imgs.forEach((img) => loadImage(img, i === at ? 'high' : 'low'));
+    }
+
     function render(opts) {
       const { index } = state;
       book.leaves.forEach((leaf, i) => {
@@ -778,7 +994,7 @@
         leaf.el.setAttribute('aria-hidden', String(!current));
       });
       // Warm up the current page and its neighbours.
-      for (let i = index - 1; i <= index + 2; i++) pages[i]?.imgs.forEach(loadImage);
+      warm();
 
       book.setIndex(index, opts);
       dom.stage.dataset.direction = state.direction;
@@ -843,6 +1059,7 @@
       go,
       next: (source, opts) => go(state.index + 1, source, opts),
       prev: (source, opts) => go(state.index - 1, source, opts),
+      warm,
       first: (source) => go(0, source),
       last: (source) => go(total - 1, source),
       open: () => setView('album'),
@@ -1136,6 +1353,110 @@
   }
 
   /* ------------------------------------------------------------------------
+     7b. Memories
+         Tap a photograph and it lifts a little (or, on the interactive page,
+         comes to the middle) while a paper slip shows its caption, date and
+         description. No modal, no overlay: the slip belongs to the page and
+         everything resets when the page turns. One photograph is open at a time.
+         Tapping anywhere else, pressing Escape or turning the page closes it.
+     ------------------------------------------------------------------------ */
+  function createMemories(album, dom) {
+    const leaves = album.book.leaves;
+    let current = null;
+
+    /** The tappable photograph under a screen point, on the page being read. */
+    function slotAt(x, y) {
+      for (const el of document.elementsFromPoint(x, y)) {
+        const slot = el.closest && el.closest('.slot[data-memory]');
+        if (slot && slot.closest('.leaf.is-current')) return slot;
+      }
+      return null;
+    }
+
+    function fill(page, slot) {
+      const memo = page.querySelector('.memo');
+      if (!memo) return;
+      memo.querySelector('.memo__date').textContent = slot.dataset.date || '';
+      memo.querySelector('.memo__cap').textContent = slot.dataset.caption || '';
+      memo.querySelector('.memo__desc').textContent = slot.dataset.description || '';
+      // Keep the slip clear of the photograph: top when the print sits in the lower half.
+      const pr = page.getBoundingClientRect();
+      const sr = slot.getBoundingClientRect();
+      const lower = sr.top + sr.height / 2 > pr.top + pr.height * 0.55;
+      if (page.dataset.mode === 'lift' || page.classList.contains('page--full')) delete memo.dataset.at;
+      else if (lower) memo.dataset.at = 'top'; else delete memo.dataset.at;
+    }
+
+    /** Bring a small print to the middle of the page (interactive page). */
+    function lift(page, slot) {
+      const pw = page.clientWidth;
+      const ph = page.clientHeight;
+      const w = slot.offsetWidth;
+      const h2 = slot.offsetHeight;
+      const zoom = Math.min((pw * 0.68) / w, (ph * 0.5) / h2, 2.4);
+      slot.style.setProperty('--lift-zoom', zoom.toFixed(3));
+      slot.style.setProperty('--tx', `${(pw / 2 - (slot.offsetLeft + w / 2)).toFixed(1)}px`);
+      slot.style.setProperty('--ty', `${(ph * 0.36 - (slot.offsetTop + h2 / 2)).toFixed(1)}px`);
+    }
+
+    /** Swap in the high-resolution file only now that someone wants a closer look. */
+    function fullResolution(slot) {
+      const url = slot.dataset.full;
+      if (!url || slot.dataset.fullState) return;
+      slot.dataset.fullState = 'loading';
+      const probe = new Image();
+      probe.onload = () => {
+        const img = slot.querySelector('.photo__img');
+        img.removeAttribute('srcset');
+        img.src = url;
+        slot.dataset.fullState = 'done';
+      };
+      probe.onerror = () => { slot.dataset.fullState = 'error'; };
+      probe.src = url;
+    }
+
+    function close() {
+      if (!current) return;
+      const slot = current;
+      const page = slot.closest('.page');
+      current = null;
+      slot.classList.remove('is-open');
+      slot.setAttribute('aria-expanded', 'false');
+      slot.style.removeProperty('--tx');
+      slot.style.removeProperty('--ty');
+      slot.style.removeProperty('--lift-zoom');
+      if (page) page.classList.remove('has-open');
+    }
+
+    function open(slot) {
+      if (current === slot) return;
+      close();
+      const page = slot.closest('.page');
+      current = slot;
+      fill(page, slot);
+      if (page.dataset.mode === 'lift') lift(page, slot);
+      slot.classList.add('is-open');
+      slot.setAttribute('aria-expanded', 'true');
+      page.classList.add('has-open');
+      fullResolution(slot);
+    }
+
+    function toggle(slot) { if (current === slot) close(); else open(slot); }
+
+    album.on('change', close);
+    album.on('view', close);
+    window.addEventListener('resize', close);
+    // Assistive tech can activate a photograph with a synthesised click.
+    dom.stage.addEventListener('click', (e) => {
+      if (e.detail !== 0) return;
+      const slot = e.target.closest && e.target.closest('.slot[data-memory]');
+      if (slot) toggle(slot);
+    });
+
+    return { slotAt, toggle, open, close, isOpen: () => Boolean(current), leaves };
+  }
+
+  /* ------------------------------------------------------------------------
      8. Input
      ------------------------------------------------------------------------ */
   function initKeyboard(album) {
@@ -1145,6 +1466,10 @@
       if (album.view !== 'album') return;
       const tag = e.target.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+      const slot = e.target.closest && e.target.closest('.slot[data-memory]');
+      if (slot && (e.key === 'Enter' || e.key === ' ')) { album.memory.toggle(slot); e.preventDefault(); return; }
+      if (e.key === 'Escape' && album.memory.isOpen()) { album.memory.close(); e.preventDefault(); return; }
 
       const t = now();
       switch (e.key) {
@@ -1226,6 +1551,9 @@
 
       // A tap that never became a drag.
       if (commitAllowed && !gesture.axis && now() - gesture.t < TAP_MAX_MS && e) {
+        const slot = album.memory.slotAt(e.clientX, e.clientY);
+        if (slot) { album.memory.toggle(slot); return; }
+        if (album.memory.isOpen()) { album.memory.close(); return; }
         const spot = e.target.closest?.('.hotspot');
         if (spot && spot.dataset.disabled !== 'true') {
           if (spot.dataset.dir === 'next') album.next('tap'); else album.prev('tap');
@@ -1424,6 +1752,7 @@
     const hooks = {};
     const album = createAlbum(cfg, buildPages(cfg), dom, fxs, hooks);
     Object.assign(hooks, createMotion(album, dom, fxs));
+    album.memory = createMemories(album, dom);
     album.book.refresh();
 
     dom.openBtn.addEventListener('click', () => album.open());
@@ -1434,6 +1763,8 @@
       const action = e.target.closest('[data-action]')?.dataset.action;
       if (action === 'restart') album.first('button');
     });
+    let resizeTimer = 0;
+    window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(album.warm, 250); });
     window.addEventListener('hashchange', () => { if (album.view === 'album') album.syncFromHash(); });
 
     initKeyboard(album);

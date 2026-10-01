@@ -3,11 +3,38 @@
 A cinematic photo album / memory book. Plain HTML + CSS + vanilla JS — no build step, no dependencies.
 
 ## Customise
-Edit **`config.js`** only: her name, birthday, cover text, the `pages` list (each page picks a `layout`: title, full, single, duo, corners, strip, mosaic, chapter, note, closing), music, and UI text.
+Edit **`config.js`** only: her name, birthday, cover text, music, UI text and the `pages` list. Each page picks a
+`layout`: `opening`, `collage`, `full`, `list`, `timeline`, `polaroids`, `interactive`, `reveal` (plus the simple
+`title`, `chapter`, `note`, `closing`).
 
-- Put photos in `assets/photos/` and name them in the pages (a missing file shows a placeholder plate).
+### Photographs
+Every photograph is a small object — the same shape on every layout:
+
+```js
+{ image: '/assets/photos/photo-01.webp',   // "/assets/…" works from any folder / sub-path
+  ratio: '4/5',                             // shape of the print (prevents layout jumps)
+  caption: 'the first photograph of us',    // handwritten
+  date: '2023-02-14',                       // or free text
+  description: 'Shown on the paper slip when the photograph is tapped.',
+  focus: '50% 40%',                         // keep faces in frame
+  position: { x: 12, y: 5, w: 52 },         // % of the page: left, top, width
+  rotation: -2.2,                           // degrees — small numbers look like real prints
+  tape: 'top' }                             // 'top' | 'corner' | 'both' | ''
+```
+Every layout has good defaults, so `position`, `rotation` and `tape` are optional. A missing file shows a placeholder plate.
+
+**Tap a photograph** → it lifts slightly (on the interactive page it comes to the middle) and a paper slip shows its
+caption, date and description. Tap again, tap elsewhere, press Esc or turn the page to put it back.
+
+### Keeping it light
+- Only the page being read, and its neighbours, are downloaded; images are `decoding="async"` and prioritised.
+- Export photos as WebP at about **1200px on the long edge** (≈100–200 KB). For phones add smaller versions and a
+  `srcset`: `srcset: '/assets/photos/photo-01-640.webp 640w, /assets/photos/photo-01.webp 1200w'`.
+- Optional `full: '/assets/photos/photo-01-2400.webp'` is fetched only when that photograph is tapped.
+- Batch-convert: `for f in *.jpg; do cwebp -q 78 -resize 1200 0 "$f" -o "${f%.jpg}.webp"; done` (or use Squoosh / ImageMagick).
+
 - Put a track in `assets/music/` and set `music.src`. It starts when she taps "Open the album".
-- Optional grain/paper textures can live in `assets/textures/`.
+- `motion: { quality: 'auto' | 'full' | 'lite' | 'off' }` — `off` behaves like reduced-motion.
 
 ## Run locally
 Open `index.html`, or serve the folder: `python3 -m http.server`.
