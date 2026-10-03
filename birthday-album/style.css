@@ -854,7 +854,7 @@ img { display: block; max-width: 100%; }
    Only the contents dim — the bars keep their solid ground, so a page turning in never shows through. */
 .album[data-layout="finale"] .album__bar > *, .album[data-layout="finale"] .album__nav > * { opacity: 0.3; transition: opacity 2.4s ease 1s; }
 .album[data-layout="finale"] .album__bar:hover > *, .album[data-layout="finale"] .album__bar:focus-within > *,
-.album[data-layout="finale"] .album__nav:hover > *, .album[data-layout="finale"] .album__nav:focus-within > * { opacity: 1; transition-delay: 0s; }
+.album[data-layout="finale"] .album__nav:hover > *, .album[data-layout="finale"] .album__nav:focus-within > * { opacity: 1; transition: opacity 0.35s ease; }
 .album[data-layout="finale"] .fx-light { opacity: 0.22; }
 .album[data-layout="finale"] .fx-grain::before { opacity: 0.045; }
 .album[data-layout="finale"] .hotspot { pointer-events: none; }   /* the message scrolls; swipe, keys and buttons still turn the page */
