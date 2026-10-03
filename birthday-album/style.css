@@ -1,0 +1,1236 @@
+/* ==========================================================================
+   Birthday Album — styles
+   --------------------------------------------------------------------------
+   Mobile-first. The book fills a phone and becomes a free-standing, portrait
+   photo book (with visible page edges and a shadow) from tablet width up.
+   Page compositions are sized in container-query units (cqw/cqh) relative to
+   the page itself, so they scale with the page, not the viewport.
+
+   Sections: 1 Tokens · 2 Base · 3 Shared · 4 Cover · 5 Album chrome ·
+             6 Book & leaves · 7 Page layouts · 8 Breakpoints · 9 Reduced motion
+   ========================================================================== */
+
+/* ---------- 1. Tokens ---------- */
+:root {
+  --ink: #0f0d0c;
+  --table: #110c0d;                    /* the dark surface the book rests on */
+  --ivory: #f3ede0;
+  --ivory-deep: #e9e0cd;
+  --wine: #4a0f1f;
+  --wine-deep: #38091a;
+  --gold: #b8935a;               /* lines and ornaments */
+  --gold-ink: #7b5a28;           /* gold as text on ivory (AA contrast) */
+  --gold-on-wine: #cfae7a;       /* gold as text on wine */
+  --hairline: rgba(15, 13, 12, 0.14);
+
+  --serif: "Cormorant Garamond", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --hand: "La Belle Aurore", "Segoe Script", "Bradley Hand", "Brush Script MT", cursive;
+  --sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --dur: 520ms;
+
+  --bar-h: 52px;
+  --nav-h: 64px;
+  --pad: clamp(20px, 6vw, 48px);       /* page padding */
+  --measure: 36rem;                     /* comfortable text width */
+
+  /* Page type scale (container units: scales with the page, not the viewport) */
+  --t-title: clamp(1.4rem, 8cqw, 2.1rem);          /* page headings */
+  --t-lead: clamp(1.05rem, 5.5cqw, 1.55rem);       /* italic serif lines */
+  --t-hand: clamp(1.05rem, 5.4cqw, 1.5rem);        /* handwritten captions */
+  --t-hand-l: clamp(1.15rem, 6.4cqw, 1.8rem);      /* the larger handwritten line on a page */
+  --t-body: clamp(0.95rem, 4.5cqw, 1.2rem);        /* small serif text */
+  --t-read: clamp(1.05rem, 5cqw, 1.5rem);          /* text meant to be read: the note, the finale */
+  /* Page spacing */
+  --gap-s: clamp(8px, 3cqw, 16px);
+  --gap-m: clamp(12px, 5cqw, 24px);
+
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+
+  /* Paper grain. Replace with a file from assets/textures/ if you like. */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ---------- 2. Base ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  height: 100%;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: var(--ink);
+  color: var(--ivory);
+  font-family: var(--sans);
+  font-size: 1rem;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+h1, h2, p, figure { margin: 0; }
+h1, h2 { text-wrap: balance; }            /* no single word stranded on the last line of a heading */
+p { text-wrap: pretty; }
+button { font: inherit; color: inherit; margin: 0; }
+img { display: block; max-width: 100%; }
+[hidden] { display: none !important; }
+
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+.stage:focus { outline: none; }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+.noscript { padding: 2rem; text-align: center; font-family: var(--serif); font-size: 1.25rem; }
+
+/* Full-viewport layers */
+.screen { position: fixed; inset: 0; }
+
+/* ---------- 3. Shared ---------- */
+.eyebrow {
+  font-family: var(--sans);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--gold-ink);
+}
+.eyebrow--quiet { color: inherit; opacity: 0.6; }
+
+.rule {
+  display: block;
+  width: 44px;
+  height: 1px;
+  background: var(--gold);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.9rem;
+  min-height: 48px;
+  padding: 0.9rem 1.6rem;
+  border: 1px solid var(--gold);
+  background: transparent;
+  color: var(--ivory);
+  font-family: var(--sans);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background-color 0.3s var(--ease), color 0.3s var(--ease);
+}
+.btn::after {
+  content: "";
+  width: 22px;
+  height: 1px;
+  background: currentColor;
+  transition: width 0.3s var(--ease);
+}
+.btn:hover { background: var(--gold); color: var(--ink); }
+.btn:hover::after { width: 34px; }
+.btn:active { background: var(--gold); color: var(--ink); }
+
+.icon-btn {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ivory);
+  cursor: pointer;
+  opacity: 0.72;
+  transition: opacity 0.2s var(--ease);
+}
+.icon-btn:hover { opacity: 1; }
+.icon-btn svg, .nav-btn svg {
+  width: 22px; height: 22px;
+  fill: none; stroke: currentColor; stroke-width: 1.2;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+
+/* ---------- 4. Cover (opening screen) ---------- */
+.gate {
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  perspective: 2400px;
+  perspective-origin: 12% 50%;
+}
+.gate::before {             /* the dark ground; it clears as the cover swings open */
+  content: "";
+  position: absolute; inset: 0;
+  background-color: var(--ink);
+  transition: opacity 1.4s var(--ease) 0.2s;
+}
+
+.cover {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  background-color: var(--wine);
+  color: var(--ivory);
+  transform-origin: 0 50%;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transition: transform 1.7s var(--ease-slow);
+}
+.cover__shade {             /* the cover darkens as it turns away from the light */
+  position: absolute; inset: 0; z-index: 5; pointer-events: none;
+  background-color: #12060a; opacity: 0;
+  transition: opacity 1.7s ease;
+}
+.cover::before {            /* paper grain */
+  content: "";
+  position: fixed; inset: 0;
+  background-image: var(--grain);
+  opacity: 0.1;
+  pointer-events: none;
+}
+.cover::after {             /* gold-stamped keyline */
+  content: "";
+  position: fixed;
+  inset: calc(var(--safe-t) + 14px) calc(var(--safe-r) + 14px) calc(var(--safe-b) + 14px) calc(var(--safe-l) + 14px);
+  border: 1px solid rgba(184, 147, 90, 0.55);
+  pointer-events: none;
+}
+
+.cover__inner {
+  position: relative;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  padding: calc(var(--safe-t) + 52px) calc(var(--safe-r) + 32px) calc(var(--safe-b) + 44px) calc(var(--safe-l) + 32px);
+  text-align: center;
+}
+
+.cover__eyebrow { color: var(--gold-on-wine); }
+
+.cover__title { display: grid; justify-items: center; gap: 1.25rem; }
+.cover__lead {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 300;
+  font-size: clamp(1.25rem, 5.5vw, 1.6rem);
+  color: var(--gold-on-wine);
+}
+.cover__name {
+  max-width: 100%;
+  font-family: var(--serif);
+  font-weight: 300;
+  font-size: clamp(3.25rem, 17vw, 5.5rem);
+  line-height: 0.95;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.cover__actions { display: grid; justify-items: center; gap: 1.25rem; }
+.cover__hint {
+  font-size: 0.6875rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ivory);
+  opacity: 0.55;
+}
+
+/* Opening the album: the cover swings open on its spine to reveal the first page. */
+[data-view="album"] .gate { visibility: hidden; pointer-events: none; transition: visibility 0s linear 1.8s; }
+[data-view="album"] .gate::before { opacity: 0; }
+[data-view="album"] .cover { transform: rotateY(-104deg); }
+[data-view="album"] .cover__shade { opacity: 0.8; }
+
+/* ---------- 5. Album chrome ---------- */
+.album {
+  z-index: 10;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background-color: var(--table);
+  color: var(--ivory);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.9s var(--ease), visibility 0s linear 0.9s;
+}
+[data-view="album"] .album {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 1s var(--ease) 0.25s, visibility 0s;
+}
+
+/* The bar and nav sit above the book so a lifting page never covers them. */
+.album__bar, .album__nav { position: relative; z-index: 5; background-color: var(--table); }
+
+.album__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: calc(var(--bar-h) + var(--safe-t));
+  padding: var(--safe-t) calc(var(--safe-r) + 4px) 0 calc(var(--safe-l) + var(--pad));
+  border-bottom: 1px solid rgba(243, 237, 224, 0.1);
+}
+.album__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--gold-on-wine);
+}
+.album__tools { display: flex; flex: none; }
+
+/* Music: two quiet words in the header, not a media player. */
+.music { display: flex; align-items: center; flex: none; margin-left: auto; margin-right: 4px; }
+.music[hidden] { display: none; }
+.music__btn {
+  display: inline-flex; align-items: center; gap: 0.45em;
+  min-height: 44px; padding: 0 9px;
+  border: 0; background: none; cursor: pointer;
+  font-family: var(--sans); font-size: 0.625rem; font-weight: 500;
+  letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--gold-on-wine); opacity: 0.72;
+  transition: opacity 0.3s var(--ease), color 0.3s var(--ease);
+}
+.music__btn:hover { opacity: 1; color: var(--ivory); }
+.music__btn--mute { position: relative; padding-left: 14px; }
+.music__btn--mute::before {              /* a thin separator dot */
+  content: ""; position: absolute; left: 0; top: 50%; width: 2px; height: 2px; margin-top: -1px;
+  border-radius: 50%; background: currentColor; opacity: 0.6;
+}
+.music__btn[aria-pressed="true"] .music__label { text-decoration: line-through; text-decoration-thickness: 1px; text-underline-offset: 0; opacity: 0.8; }
+.music__note { font-size: 1.45em; letter-spacing: 0; line-height: 1; display: inline-block; }
+.music[data-state="playing"] .music__note { animation: note 4.2s ease-in-out infinite; }
+.music[data-state="loading"] .music__note { animation: note 1.4s ease-in-out infinite; }
+.music[data-state="paused"] .music__note, .music[data-state="idle"] .music__note { opacity: 0.55; }
+@keyframes note {
+  0%, 100% { transform: translateY(0); opacity: 0.75; }
+  50%      { transform: translateY(-1.5px); opacity: 1; }
+}
+@media (max-width: 519px) {
+  .album__title { display: none; }       /* the music words take the left of the bar */
+  .music { margin-left: 0; margin-right: auto; }
+  .album__bar { padding-left: calc(var(--safe-l) + 8px); }
+}
+:root[data-reduced] .music__note { animation: none !important; }
+
+.progress {
+  position: absolute;
+  left: 0; right: 0; bottom: -1px;
+  height: 2px;
+  background: var(--gold);
+  transform-origin: 0 50%;
+  transform: scaleX(var(--progress, 0));
+  transition: transform 0.6s var(--ease);
+}
+
+.album__nav {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  min-height: calc(var(--nav-h) + var(--safe-b));
+  padding: 0 calc(var(--safe-r) + 8px) var(--safe-b) calc(var(--safe-l) + 8px);
+  border-top: 1px solid rgba(243, 237, 224, 0.1);
+}
+
+.counter {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5em;
+  font-family: var(--serif);
+  font-size: 1.25rem;
+  font-variant-numeric: lining-nums tabular-nums;
+  letter-spacing: 0.04em;
+}
+.counter__sep, .counter__total { color: var(--gold-on-wine); }
+.counter__total { font-size: 0.9em; }
+
+.nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  background: none;
+  color: var(--ivory);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: opacity 0.25s var(--ease), color 0.25s var(--ease);
+}
+.nav-btn--prev { justify-self: start; }
+.nav-btn--next { justify-self: end; }
+.nav-btn:hover { color: var(--gold-on-wine); }
+.nav-btn[aria-disabled="true"] { opacity: 0.25; cursor: default; pointer-events: none; }
+.nav-btn__label { display: none; }
+
+/* ---------- 6. Book & leaves ---------- */
+
+/* The stage is a size container: the book is sized from it, so it can keep a
+   photo-book proportion (0.62–0.82 wide:tall) on every screen. */
+.stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  container-type: size;
+  padding: clamp(10px, 2.2vh, 28px) clamp(12px, 4vw, 40px);
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.stage:focus { outline: none; }
+.stage.is-dragging { cursor: grabbing; }
+
+.book {
+  --h: min(100cqh, calc(100cqw / 0.62));
+  --w: min(100cqw, calc(var(--h) * 0.82));
+  position: relative;
+  width: var(--w);
+  height: var(--h);
+  max-height: 900px;
+  perspective: 2600px;
+  perspective-origin: 18% 50%;
+}
+.book.is-rubber { transition: transform 0.45s var(--ease); }
+
+/* Static page-block behind the leaves: edges of the unturned pages + shadow. */
+.book__block {
+  position: absolute;
+  inset: 0;
+  border-radius: 1px 3px 3px 1px;
+  background-color: #e4dac5;
+  box-shadow: 0 14px 28px -12px rgba(0, 0, 0, 0.7);
+}
+
+.leaf {
+  position: absolute;
+  inset: 0;
+  border-radius: 1px 3px 3px 1px;
+  transform-origin: 0 50%;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
+.leaf.is-live { visibility: visible; will-change: transform, opacity; }
+.leaf.is-current { pointer-events: auto; }
+
+.leaf__face {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  container-type: size;
+  border-radius: inherit;
+  background-color: var(--ivory);
+  color: var(--ink);
+  --m: clamp(16px, 8cqw, 44px);       /* page margin */
+  --gut: 4.5cqw;                       /* extra room beside the spine */
+}
+.leaf[data-tone="wine"] .leaf__face { background-color: var(--wine); color: var(--ivory); }
+.leaf[data-tone="wine-deep"] .leaf__face { background-color: var(--wine-deep); color: var(--ivory); }
+.leaf__face::after {                   /* paper grain */
+  content: "";
+  position: absolute; inset: 0;
+  background-image: var(--grain);
+  opacity: 0.06;
+  pointer-events: none;
+}
+
+.leaf__spine {                         /* the gutter where the page curves into the binding */
+  position: absolute;
+  top: 0; bottom: 0; left: 0;
+  width: clamp(16px, 8cqw, 40px);
+  background: linear-gradient(90deg, rgba(30, 18, 8, 0.24), rgba(30, 18, 8, 0.07) 55%, rgba(30, 18, 8, 0));
+  pointer-events: none;
+  z-index: 3;
+}
+.leaf__cast {                          /* shadow of the page lifting above this one */
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: linear-gradient(90deg, rgba(10, 6, 4, 0.6), rgba(10, 6, 4, 0.16) 62%, rgba(10, 6, 4, 0));
+  pointer-events: none;
+  z-index: 4;
+}
+.leaf.is-live .leaf__cast, .leaf.is-live .leaf__shade { will-change: opacity; }
+.leaf__shade {                         /* the page darkens as it turns away from the light */
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(10, 6, 4, 0.08), rgba(10, 6, 4, 0.55));
+  pointer-events: none;
+}
+
+/* Edge hot-spots: click/tap to turn, hover (mouse) to lift the page a little. */
+.hotspot {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 16%;
+  z-index: 100;
+}
+.hotspot--prev { left: 0; }
+.hotspot--next { right: 0; }
+.fine-pointer .hotspot { cursor: pointer; }
+.hotspot[data-disabled="true"] { pointer-events: none; }
+
+/* Photographs --------------------------------------------------------- */
+.photo {
+  --mat: 0px;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+}
+.photo__well {
+  position: absolute;
+  inset: var(--mat) var(--mat) var(--chin, var(--mat));
+  overflow: hidden;
+  background-color: var(--ivory-deep);
+}
+.photo__reveal { position: absolute; inset: -4%; }
+.photo__img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transform: scale(1.08);
+  transition: opacity 0.6s var(--ease);
+  -webkit-user-drag: none;
+}
+.leaf.is-live .photo__img { will-change: transform; }
+.photo.is-loaded .photo__img { opacity: 1; }
+
+.photo__missing {                      /* placeholder plate for a missing photograph */
+  position: absolute; inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background-color: var(--wine);
+  color: var(--gold-on-wine);
+  font-size: 0.625rem;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+}
+.photo__missing span:last-child { font-family: var(--serif); font-size: 1.4rem; letter-spacing: 0.06em; text-transform: none; }
+.photo.is-missing .photo__missing { display: flex; }
+.photo[data-tone="1"] .photo__missing { background-color: #1d1716; }
+.photo[data-tone="2"] .photo__missing { background-color: #77634c; color: #f3ede0; }
+
+/* Printed photographs: a card mat, a polaroid, a thin-bordered print, or no border at all.
+   Shadows are layered the way a real print sits on paper: a tight contact shadow,
+   a soft mid shadow and a long, faint one. */
+.photo--mat, .photo--polaroid, .photo--frame {
+  --print-shadow: 0 1px 1px rgba(24, 14, 6, 0.3), 0 4px 7px -2px rgba(24, 14, 6, 0.28), 0 14px 22px -10px rgba(24, 14, 6, 0.4);
+  box-shadow: var(--print-shadow);
+}
+.photo--mat      { --mat: clamp(6px, 2.4cqw, 12px); background-color: var(--stock, #faf6ec); }
+.photo--polaroid { --mat: clamp(7px, 3.1cqw, 15px); --chin: clamp(36px, 14cqw, 66px); background-color: var(--stock, #fbf8ef); }
+.photo--frame    { --mat: clamp(3px, 1.1cqw, 6px);  background-color: var(--stock, #faf6ec); }
+.photo--bleed    { --mat: 0px; }
+
+/* The surface of the card: a faint matte grain over the whole print. */
+.photo__paper { position: absolute; inset: 0; z-index: 3; pointer-events: none; background-image: var(--grain); opacity: 0.08; }
+
+/* The caption written on a polaroid's white border. */
+.photo__chin {
+  position: absolute; left: var(--mat); right: var(--mat); bottom: 0; height: var(--chin); z-index: 4;
+  display: grid; place-items: center; padding: 0 0.3em; overflow: hidden;
+  text-align: center; font-size: clamp(0.78rem, 4.3cqw, 1.18rem); line-height: 1.05;
+}
+
+/* Handwriting: a fine pen, slightly off the horizontal. */
+.hand { font-family: var(--hand); font-weight: 400; color: #3a2a22; line-height: 1.2; }
+
+/* Strips of tape holding a print down. */
+.tape {
+  position: absolute; z-index: 5; pointer-events: none;
+  width: 21cqw; height: 5.4cqw;
+  background-color: rgba(232, 219, 183, 0.82);
+  box-shadow: 0 1px 2px rgba(24, 14, 6, 0.22), inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+.tape--top    { top: -2.6cqw; left: 50%; margin-left: -10.5cqw; transform: rotate(-2.6deg); }
+.tape--corner { top: -0.4cqw; right: -6.4cqw; width: 18cqw; transform: rotate(38deg); }
+
+/* Canvas particle field inside a page (dust, petals, sparks) */
+.fx-canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
+
+/* ---------- 7. Page layouts ---------- */
+.page {
+  position: absolute;
+  inset: 0;
+  padding: var(--m) var(--m) var(--m) calc(var(--m) + var(--gut));
+  display: flex;
+  flex-direction: column;
+}
+.meta { display: flex; flex-wrap: wrap; gap: 0.2rem 1rem; }
+.meta__date { color: var(--ink); opacity: 0.6; }
+
+/* title ------------------------------------------------------------- */
+.page--title { align-items: center; justify-content: space-between; text-align: center; padding-block: calc(var(--m) * 1.5); }
+.page--title::before {
+  content: "";
+  position: absolute;
+  inset: calc(var(--m) * 0.5) calc(var(--m) * 0.5) calc(var(--m) * 0.5) calc(var(--m) * 0.5 + var(--gut));
+  border: 1px solid rgba(184, 147, 90, 0.55);
+  pointer-events: none;
+}
+.title__mid { display: grid; justify-items: center; gap: 1.2rem; }
+.title__name {
+  max-width: 100%;
+  font-family: var(--serif);
+  font-weight: 300;
+  font-size: clamp(2.8rem, 25cqw, 6.5rem);
+  line-height: 0.95;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+.title__subtitle {
+  max-width: 17em;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: var(--t-lead);
+  line-height: 1.4;
+}
+
+/* Slots: where a print sits on the page. Placement and tilt come from config; tapping
+   lifts the print a little (and, on the interactive page, brings it to the middle). */
+.slot {
+  position: absolute;
+  z-index: var(--z, 1);
+  transform: translate3d(var(--tx, 0px), var(--ty, 0px), 0) rotate(var(--rot, var(--tilt, 0deg))) scale(var(--zoom, 1));
+  transition: transform 0.8s var(--ease-soft), opacity 0.6s ease;
+  -webkit-tap-highlight-color: transparent;
+  outline-offset: 6px;
+}
+.slot--flow { position: relative; }
+.slot[data-memory] { cursor: pointer; }
+.slot.is-open { --rot: 0deg; --zoom: var(--lift-zoom, var(--open-zoom, 1.07)); z-index: 40; }
+.page.has-open .slot:not(.is-open) { opacity: 0.42; }
+
+/* The paper slip that carries the caption, date and description of the open photograph. */
+.memo {
+  position: absolute; z-index: 60;
+  left: calc(var(--m) + var(--gut)); right: var(--m); bottom: var(--m);
+  display: grid; gap: 0.3rem;
+  padding: 4.2cqw 4.6cqw 4cqw;
+  background-color: #faf6ec; color: var(--ink);
+  box-shadow: 0 1px 1px rgba(24, 14, 6, 0.3), 0 8px 14px -6px rgba(24, 14, 6, 0.4), 0 22px 30px -16px rgba(24, 14, 6, 0.45);
+  transform: rotate(-0.7deg);
+  opacity: 0; translate: 0 14px; pointer-events: none;
+  transition: opacity 0.5s var(--ease-soft), translate 0.65s var(--ease-soft);
+}
+.memo[data-at="top"] { top: var(--m); bottom: auto; }
+.page.has-open .memo { opacity: 1; translate: none; }
+.memo p:empty { display: none; }
+.memo__cap { font-size: var(--t-hand); }
+.memo__desc { font-family: var(--serif); font-size: var(--t-body); line-height: 1.42; color: #4a3b33; }
+.memo .tape { top: -2.4cqw; left: auto; right: 10%; margin: 0; width: 15cqw; height: 4.4cqw; transform: rotate(3deg); }
+
+/* 1 · opening ------------------------------------------------------- */
+.page--opening {
+  display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: var(--gap-s);
+  text-align: center; padding-top: calc(var(--m) * 0.9);
+}
+.opening__head { display: grid; gap: 0.2rem; justify-items: center; }
+.opening__name { font-family: var(--serif); font-weight: 300; font-size: clamp(1.9rem, 12cqw, 3.5rem); line-height: 1; }
+.opening__print { min-height: 0; display: grid; place-items: center; padding-block: 2cqw; }
+.opening__print .slot { height: 100%; width: auto; max-width: 100%; }
+.opening__foot { display: grid; gap: 0.2rem; justify-items: center; }
+.opening__caption { font-size: var(--t-hand-l); transform: rotate(-1.2deg); }
+
+/* 2 · collage, 6 · polaroids, 7 · interactive: free composition of prints */
+.page--collage, .page--polaroids, .page--interactive { padding: 0; }
+
+/* 3 · full-screen-style photograph ------------------------------------ */
+.page--full { padding: 0; }
+.page--full .slot { position: absolute; inset: 0; width: 100%; height: 100%; aspect-ratio: auto !important; }
+.page--full .slot.is-open { --zoom: 1; }
+.full__label {
+  position: absolute; z-index: 5; left: calc(var(--m) + var(--gut)); right: var(--m); bottom: var(--m);
+  display: grid; gap: 0.3rem; color: var(--ivory); text-shadow: 0 1px 16px rgba(0, 0, 0, 0.5);
+  transition: opacity 0.5s ease; pointer-events: none;
+}
+.full__label .eyebrow, .full__label .meta__date { color: var(--ivory); opacity: 0.85; }
+.full__title { font-family: var(--serif); font-weight: 400; font-size: var(--t-title); line-height: 1.08; }
+.page.has-open .full__label { opacity: 0; }
+.full__scrim {
+  position: absolute; z-index: 4; left: 0; right: 0; bottom: 0; height: 58%; pointer-events: none;
+  background: linear-gradient(to top, rgba(10, 6, 4, 0.62), rgba(10, 6, 4, 0));
+  opacity: 0.55; transition: opacity 0.9s ease;
+}
+.page.has-open .full__scrim { opacity: 1; }
+.page--full .memo { background: none; box-shadow: none; padding: 0; color: var(--ivory); transform: none; text-shadow: 0 1px 14px rgba(0, 0, 0, 0.5); }
+.page--full .memo .eyebrow { color: var(--gold-on-wine); }
+.page--full .memo .hand, .page--full .memo__cap { color: var(--ivory); }
+.page--full .memo__desc { color: rgba(243, 237, 224, 0.88); }
+.page--full .memo .tape { display: none; }
+
+/* 4 · little things I love about you ------------------------------- */
+.page--list { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: var(--gap-s); }
+.list__head { display: grid; gap: 0.35rem; }
+.list__title { font-family: var(--serif); font-weight: 400; font-size: var(--t-title); line-height: 1.06; }
+.list__items { list-style: none; margin: 0; padding: 0; display: grid; align-content: space-evenly; min-height: 0; }
+.list__item {
+  position: relative; display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 3.4cqw;
+  padding-block: 0.55em; font-family: var(--serif); font-size: var(--t-body); line-height: 1.28;
+}
+.list__num { font-family: var(--sans); font-size: 0.56em; letter-spacing: 0.2em; color: var(--gold-ink); }
+.list__item::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--hairline);
+  transform-origin: 0 50%; scale: 0 1;
+  transition: scale 1100ms var(--ease-slow); transition-delay: calc(var(--base) + var(--rd, 0ms) + 500ms);
+}
+.leaf.is-entered .list__item::after { scale: 1; }
+.list__photo { display: none; }
+@container (min-width: 430px) {
+  .list__photo { display: block; position: absolute; right: var(--m); bottom: var(--m); width: 31%; }
+  .list__items { padding-right: 36cqw; }
+}
+
+/* 5 · timeline ---------------------------------------------------------- */
+.page--timeline { display: grid; grid-template-rows: auto minmax(0, 1fr); }
+.tl__head { display: grid; gap: 0.35rem; padding-bottom: clamp(8px, 3cqw, 16px); }
+.tl__heading { font-family: var(--serif); font-weight: 400; font-size: var(--t-title); line-height: 1.05; }
+.tl__rows { position: relative; display: grid; grid-template-rows: repeat(4, minmax(0, 1fr)); min-height: 0; }
+.tl__row {
+  position: relative; display: grid; grid-template-columns: 31% 1fr; align-items: center; min-height: 0;
+  gap: var(--gap-m); padding-block: clamp(5px, 1.8cqw, 9px);
+}
+.tl__row::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1px; background: var(--hairline);
+  transform-origin: 0 50%; scale: 0 1;
+  transition: scale calc(1100ms * var(--tk)) var(--ease-slow); transition-delay: calc(var(--base) + var(--rd, 0ms));
+}
+.leaf.is-entered .tl__row::before { scale: 1; }
+.tl__row .slot { height: 100%; width: auto; max-width: 100%; justify-self: start; }
+.tl__text { display: grid; gap: 0.2rem; align-content: center; min-width: 0; }
+.tl__caption { font-size: var(--t-hand); }
+.tl__line {
+  position: absolute; z-index: 1; left: calc(-1 * var(--gut) - 6px); top: 5%; bottom: 5%; width: 1px; background: var(--gold);
+}
+.tl__node {
+  position: absolute; z-index: 2; top: 50%; left: calc(-1 * var(--gut) - 9.5px);
+  width: 8px; height: 8px; margin-top: -4px; border-radius: 50%; background: var(--ivory); border: 1px solid var(--gold);
+  transition-delay: calc(var(--base) + var(--rd, 0ms)) !important;
+}
+
+/* 7 · interactive ------------------------------------------------------- */
+.interactive__title { position: absolute; z-index: 2; left: calc(var(--m) + var(--gut)); top: calc(var(--m) * 0.55); font-size: var(--t-hand-l); }
+.interactive__hint { position: absolute; z-index: 2; left: 0; right: 0; bottom: calc(var(--m) * 0.55); text-align: center; color: var(--gold-ink); transition: opacity 0.5s ease; }
+.page--interactive.has-open .slot:not(.is-open) { opacity: 0.2; }
+.leaf[data-tone="proof"] .leaf__face { background-color: #e8dfca; }
+.slot__no {                                  /* the small number under each frame of the proof sheet */
+  position: absolute; left: 0; top: calc(100% + 1.6cqw);
+  font-family: var(--sans); font-size: 0.5625rem; font-weight: 500; letter-spacing: 0.22em; color: var(--gold-ink);
+}
+.page--interactive .photo--frame { --mat: clamp(4px, 1.4cqw, 7px); }
+.page.has-open .interactive__hint { opacity: 0 !important; transition-delay: 0s !important; }
+
+/* 8 · the finale -------------------------------------------------------
+   Different on purpose: near-black, one photograph, almost no ornament, and slow.
+   script.js (createFinale) only switches data-scene on the page:
+     idle -> lead -> greeting -> message -> end
+   and everything below is how each scene looks. Delays live on the *destination*
+   scene's rule so that only arriving is staged, never leaving. */
+.leaf[data-tone="ink"] .leaf__face { background-color: #0a0406; color: var(--ivory); }
+.page--finale { display: block; padding: 0; background-color: #0a0406; color: var(--ivory); }
+
+/* The photograph: dark until the greeting, then it slowly develops and settles. */
+.finale__photo { position: absolute; z-index: 1; inset: 0; width: 100%; height: 100%; opacity: 0; transition: opacity 3.2s ease; }
+.page--finale:is([data-scene="greeting"], [data-scene="message"], [data-scene="end"]) .finale__photo { opacity: 1; }
+.page--finale .photo__missing { background-color: #2a1a14; }
+.page--finale .photo__missing span { opacity: 0; }   /* a missing photo is just a warm dark ground here */
+.page--finale .photo[data-reveal="develop"] .photo__veil {
+  background-color: #0a0406; transform: none; opacity: 1;
+  transition: opacity 8s cubic-bezier(0.4, 0, 0.3, 1); transition-delay: 0s;
+}
+.leaf.is-entered .page--finale .photo[data-reveal="develop"] .photo__veil { opacity: 1; }
+.leaf.is-entered .page--finale:is([data-scene="greeting"], [data-scene="message"], [data-scene="end"]) .photo[data-reveal="develop"] .photo__veil { opacity: 0; }
+.page--finale .photo__reveal { transition: scale 18s cubic-bezier(0.3, 0, 0.2, 1); transition-delay: 0s; }
+.leaf.is-entered .page--finale .photo__reveal { scale: 1.12; }
+.leaf.is-entered .page--finale:is([data-scene="greeting"], [data-scene="message"], [data-scene="end"]) .photo__reveal { scale: 1; }
+
+/* Darkening: a scrim behind the greeting, an even veil behind the message. */
+.finale__scrim {
+  position: absolute; z-index: 2; left: 0; right: 0; bottom: 0; height: 64%; pointer-events: none;
+  background: linear-gradient(to top, rgba(10, 4, 6, 0.86), rgba(10, 4, 6, 0)); opacity: 0; transition: opacity 3s ease;
+}
+.page--finale[data-scene="greeting"] .finale__scrim { opacity: 1; transition-delay: 1.4s; }
+.finale__shade { position: absolute; z-index: 2; inset: 0; pointer-events: none; background-color: #0a0406; opacity: 0; transition: opacity 2.8s ease; }
+.page--finale:is([data-scene="message"], [data-scene="end"]) .finale__shade { opacity: 0.72; }
+
+/* "One last thing…" */
+.finale__lead {
+  position: absolute; z-index: 4; inset: 0; display: grid; place-items: center; padding: var(--m); text-align: center;
+  font-family: var(--serif); font-style: italic; font-weight: 300; font-size: clamp(1.4rem, 7.6cqw, 2.4rem); line-height: 1.25; color: var(--ivory);
+  opacity: 0; translate: 0 12px; transition: opacity 1.4s ease, translate 2.6s var(--ease-soft); pointer-events: none;
+}
+.page--finale[data-scene="lead"] .finale__lead { opacity: 1; translate: 0 0; }
+.page--finale:is([data-scene="greeting"], [data-scene="message"], [data-scene="end"]) .finale__lead { opacity: 0; translate: 0 -8px; }
+
+/* "Happy Birthday, NAME" */
+.finale__greet {
+  position: absolute; z-index: 4; left: 0; right: 0; bottom: calc(var(--m) * 1.7); padding-inline: var(--m);
+  display: grid; justify-items: center; gap: 0.35rem; text-align: center; pointer-events: none;
+  transition: opacity 1.6s ease;
+}
+.page--finale:is([data-scene="message"], [data-scene="end"]) .finale__greet { opacity: 0; }
+.finale__hb {
+  font-family: var(--serif); font-style: italic; font-weight: 300; font-size: var(--t-lead); color: var(--gold-on-wine);
+  opacity: 0; translate: 0 8px; transition: opacity 1.8s ease, translate 2.4s var(--ease-soft);
+}
+.page--finale:is([data-scene="greeting"], [data-scene="message"], [data-scene="end"]) .finale__hb { opacity: 1; translate: none; }
+.page--finale[data-scene="greeting"] .finale__hb { transition-delay: 2.4s; }
+.finale__name {
+  max-width: 100%; margin: 0; font-family: var(--serif); font-weight: 300; line-height: 1.02; overflow-wrap: anywhere;
+  font-size: min(clamp(2.5rem, 17cqw, 5.4rem), calc((100cqw - var(--m) * 2.4) / (var(--chars, 6) * 0.5)));
+}
+.fn { display: inline-block; overflow: hidden; vertical-align: top; padding-bottom: 0.2em; margin-bottom: -0.2em; }
+.fn__in { display: inline-block; transform: translate3d(0, 115%, 0); transition: transform 2.4s var(--ease-soft); }
+.page--finale:is([data-scene="greeting"], [data-scene="message"], [data-scene="end"]) .fn__in { transform: none; }
+.page--finale[data-scene="greeting"] .fn__in { transition-delay: calc(3.1s + var(--wi, 0) * 0.22s); }
+
+/* The message. */
+.finale__scroll {
+  position: absolute; z-index: 5; inset: 0; display: flex; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain;
+  padding: calc(var(--m) * 1.8) calc(var(--m) * 1.15) calc(var(--m) * 2.4);
+  scrollbar-width: none; opacity: 0; visibility: hidden; touch-action: pan-y;
+  /* the first and last lines melt into the page instead of being cut off */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 7%, #000 92%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 7%, #000 92%, transparent 100%);
+  transition: opacity 1.8s ease, visibility 0s linear 1.8s;
+}
+.finale__scroll::-webkit-scrollbar { display: none; }
+.page--finale:is([data-scene="message"], [data-scene="end"]) .finale__scroll { opacity: 1; visibility: visible; transition: opacity 1.8s ease 1.3s, visibility 0s; }
+.finale__inner { width: 100%; max-width: 30rem; margin: auto; }
+.finale__p {
+  margin: 0 0 1.4em; font-family: var(--serif); font-weight: 400; font-size: var(--t-read); line-height: 1.62;
+  color: rgba(243, 237, 224, 0.95); text-shadow: 0 1px 14px rgba(0, 0, 0, 0.55);
+}
+.fs { opacity: 0; transition: opacity 2.2s ease; }
+.fs.is-in { opacity: 1; }
+.finale__end { display: grid; justify-items: center; gap: 1.1rem; margin-top: 2.4em; text-align: center; opacity: 0; transition: opacity 2.6s ease; }
+.finale__end.is-in { opacity: 1; }
+.finale__closing { margin: 0; font-family: var(--serif); font-style: italic; font-weight: 300; font-size: var(--t-lead); line-height: 1.35; color: var(--gold-on-wine); }
+.finale__again {
+  min-height: 44px; margin-top: 0.4rem; padding: 0.5rem 0.2rem; border: 0; border-bottom: 1px solid rgba(184, 147, 90, 0.55); background: none; cursor: pointer;
+  font-family: var(--sans); font-size: 0.6875rem; font-weight: 500; letter-spacing: 0.24em; text-transform: uppercase; color: rgba(243, 237, 224, 0.62);
+  transition: color 0.3s ease, border-color 0.3s ease;
+}
+.finale__again:hover { color: var(--ivory); border-bottom-color: var(--gold); }
+
+/* On the finale the chrome steps back: the words and the photograph are all there is.
+   Only the contents dim — the bars keep their solid ground, so a page turning in never shows through. */
+.album[data-layout="finale"] .album__bar > *, .album[data-layout="finale"] .album__nav > * { opacity: 0.3; transition: opacity 2.4s ease 1s; }
+.album[data-layout="finale"] .album__bar:hover > *, .album[data-layout="finale"] .album__bar:focus-within > *,
+.album[data-layout="finale"] .album__nav:hover > *, .album[data-layout="finale"] .album__nav:focus-within > * { opacity: 1; transition: opacity 0.35s ease; }
+.album[data-layout="finale"] .fx-light { opacity: 0.22; }
+.album[data-layout="finale"] .fx-grain::before { opacity: 0.045; }
+.album[data-layout="finale"] .hotspot { pointer-events: none; }   /* the message scrolls; swipe, keys and buttons still turn the page */
+
+/* chapter: a wine divider -------------------------------------------- */
+.page--chapter { align-items: center; justify-content: center; text-align: center; gap: clamp(14px, 6cqw, 30px); }
+.page--chapter::before {
+  content: "";
+  position: absolute;
+  inset: calc(var(--m) * 0.5) calc(var(--m) * 0.5) calc(var(--m) * 0.5) calc(var(--m) * 0.5 + var(--gut));
+  border: 1px solid rgba(184, 147, 90, 0.5);
+  pointer-events: none;
+}
+.chapter__numeral { font-family: var(--serif); font-weight: 300; font-size: clamp(5rem, 54cqw, 12rem); line-height: 0.8; color: var(--gold); }
+.chapter__text { display: grid; justify-items: center; gap: 1rem; }
+.chapter__title { font-family: var(--serif); font-weight: 400; font-size: var(--t-title); line-height: 1.05; }
+.chapter__caption { max-width: 16em; font-family: var(--serif); font-style: italic; font-size: var(--t-lead); color: var(--gold-on-wine); }
+
+/* note: the written message ----------------------------------------- */
+.page--note { justify-content: center; gap: clamp(14px, 5cqw, 26px); }
+.note__body { max-width: 100%; }
+.note__body { display: grid; gap: 0.9em; }
+.note__p { font-family: var(--serif); font-size: var(--t-read); line-height: 1.5; }
+.note__sign { display: grid; gap: 0.2rem; }
+.note__signoff { font-family: var(--serif); font-style: italic; font-size: var(--t-lead); }
+.note__signature { justify-self: start; font-size: clamp(1.6rem, 9cqw, 2.4rem); }
+.note__sign { position: relative; }
+.note__spark { position: absolute; left: calc(100% - 4cqw); bottom: 0.9rem; width: 9px; height: 9px; border-radius: 50%; border: 1px solid var(--gold); }
+.note__sprig { position: absolute; right: calc(var(--m) * 0.8); bottom: calc(var(--m) * 0.7); width: 15cqw; pointer-events: none; }
+.sprig { display: block; width: 100%; height: auto; overflow: visible; }
+.sprig path { fill: rgba(184, 147, 90, 0); stroke: var(--gold); stroke-width: 1; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; vector-effect: non-scaling-stroke; }
+
+/* closing -------------------------------------------------------------- */
+.page--closing { align-items: center; justify-content: center; text-align: center; gap: clamp(14px, 6cqw, 28px); }
+.closing__heading { font-family: var(--serif); font-weight: 300; font-size: clamp(2.4rem, 17cqw, 4.8rem); line-height: 1; }
+.closing__text { font-family: var(--serif); font-style: italic; font-size: var(--t-lead); color: var(--gold-on-wine); }
+.btn--onwine { margin-top: 0.5rem; }
+
+/* ---------- 8. Breakpoints ---------- */
+
+/* Very small phones (320px) */
+@media (max-width: 359px) {
+  :root { --nav-h: 58px; }
+  .cover__inner { padding-left: calc(var(--safe-l) + 24px); padding-right: calc(var(--safe-r) + 24px); }
+  .btn { padding-inline: 1.2rem; letter-spacing: 0.2em; }
+}
+
+/* Short screens: landscape phones, small windows */
+@media (max-height: 520px) {
+  :root { --bar-h: 44px; --nav-h: 52px; --pad: 16px; }
+  .cover__inner { gap: 1rem; padding-top: calc(var(--safe-t) + 32px); padding-bottom: calc(var(--safe-b) + 28px); }
+  .cover__title { gap: 0.6rem; }
+  .cover__name { font-size: clamp(2.5rem, 12vh, 4rem); }
+}
+
+/* Footer buttons gain labels once there is space */
+@media (min-width: 480px) {
+  .nav-btn__label { display: inline; }
+}
+
+/* Tablet: the book becomes a free-standing object with visible page edges */
+@media (min-width: 768px) {
+  :root { --bar-h: 60px; --nav-h: 72px; --pad: clamp(32px, 6vw, 64px); }
+  .eyebrow, .album__title, .nav-btn { font-size: 0.75rem; }
+  .counter { font-size: 1.5rem; }
+  .album__bar { padding-left: calc(var(--safe-l) + var(--pad)); padding-right: calc(var(--safe-r) + var(--pad) - 8px); }
+  .album__nav { padding-inline: calc(var(--safe-l) + var(--pad) - 12px) calc(var(--safe-r) + var(--pad) - 12px); }
+  .stage { padding-block: clamp(16px, 3vh, 36px); }
+  .book__block {
+    box-shadow:
+      1px 0 0 #cfc4ac, 2px 0 0 #e9e0cd, 3px 0 0 #cfc4ac, 4px 0 0 #e9e0cd, 5px 0 0 #c9bea6,
+      0 30px 50px -18px rgba(0, 0, 0, 0.75);
+  }
+  .note__p:first-child::first-letter {
+    float: left;
+    padding: 0.06em 0.08em 0 0;
+    font-size: 3.2em;
+    line-height: 0.8;
+    color: var(--wine);
+  }
+}
+
+/* The cover becomes a bound book on larger screens */
+@media (min-width: 768px) and (min-height: 600px) {
+  .cover {
+    width: min(460px, 74dvh);
+    height: min(88dvh, 680px);
+    box-shadow: 0 0 0 1px rgba(184, 147, 90, 0.18);
+  }
+  .cover::before, .cover::after { position: absolute; }
+  .cover::after { inset: 14px; }
+  .cover__inner { padding: 52px 36px 44px; }
+}
+
+/* Desktop pointer: hover affordances */
+@media (hover: hover) and (pointer: fine) {
+  .btn, .nav-btn, .icon-btn { cursor: pointer; }
+}
+
+/* ---------- 9. Motion ----------
+   Principles: everything is transform / opacity (plus a brief blur on text and
+   a drawn SVG stroke); nothing animates layout. Entrances are CSS transitions
+   that play when the engine adds `.is-entered` to a leaf, with the timing
+   authored per element in script.js through --d (delay) and --t (duration).
+   Idle motion (drift, sway, light, grain) only runs on the current page.
+   Tiers: phone < tablet < desktop; `html[data-lite]` trims further and
+   `html[data-reduced]` replaces movement with fades (section 10). */
+
+:root {
+  --ease-soft: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-slow: cubic-bezier(0.45, 0, 0.15, 1);
+  --base: 160ms;            /* wait before a page's storyboard starts */
+  --tk: 1;                  /* duration multiplier by tier */
+  --fx-dist: 26px;          /* how far things travel when they arrive */
+  --fx-blur: 6px;
+  --drift-s: 0.05;          /* slow push-in on photographs */
+  --drift-x: -1.2%;
+  --drift-y: -0.9%;
+  --sway: 0.7deg;           /* loose prints resting on the page */
+}
+@media (max-width: 767px) {
+  :root { --tk: 0.8; --fx-dist: 10px; --fx-blur: 1.5px; --drift-s: 0.022; --drift-x: -0.6%; --drift-y: -0.4%; --sway: 0.35deg; }
+}
+@media (min-width: 768px) and (max-width: 1023px) {
+  :root { --tk: 0.92; --fx-dist: 18px; --fx-blur: 3.5px; --drift-s: 0.035; --drift-x: -0.9%; --drift-y: -0.65%; --sway: 0.5deg; }
+}
+:root[data-lite] { --fx-blur: 0px; --drift-s: 0.015; }
+
+/* -- Entrances -------------------------------------------------------- */
+.leaf [data-fx] { --t0: calc(var(--t, 1000ms) * var(--tk)); --dly: calc(var(--base) + var(--rd, 0ms) + var(--d, 0ms)); }
+
+.leaf [data-fx="rise"], .leaf [data-fx="fade"], .leaf [data-fx="drop"],
+.leaf [data-fx="draw"], .leaf [data-fx="draw-dot"], .leaf [data-fx="draw-line"] { opacity: 0; }
+.leaf [data-fx="rise"] { translate: 0 var(--fx-dist); filter: blur(var(--fx-blur)); }
+.leaf [data-fx="drop"] {
+  translate: var(--fx-x, 0px) calc(var(--fx-dist) * -1.6);
+  rotate: var(--fx-r, 3deg);
+  scale: 1.05;
+}
+.leaf [data-fx="draw"] { scale: 0 1; transform-origin: 0 50%; }
+.leaf [data-fx="draw-dot"] { scale: 0; }
+.leaf [data-fx="draw-line"] { scale: 1 0; transform-origin: 50% 0; }
+
+.leaf [data-fx="rise"], .leaf [data-fx="fade"], .leaf [data-fx="drop"], .leaf [data-fx="draw"],
+.leaf [data-fx="draw-dot"], .leaf [data-fx="draw-line"] {
+  transition:
+    opacity var(--t0) var(--ease-soft),
+    translate var(--t0) var(--ease-soft),
+    rotate calc(var(--t0) * 1.15) var(--ease-soft),
+    scale var(--t0) var(--ease-soft),
+    filter var(--t0) var(--ease-soft);
+  transition-delay: var(--dly);
+}
+.leaf [data-fx="draw-line"] { transition-timing-function: var(--ease-slow); }
+
+.leaf.is-entered [data-fx="rise"], .leaf.is-entered [data-fx="fade"], .leaf.is-entered [data-fx="drop"],
+.leaf.is-entered [data-fx="draw"], .leaf.is-entered [data-fx="draw-dot"], .leaf.is-entered [data-fx="draw-line"] { opacity: 1; translate: none; rotate: none; scale: none; filter: none; }
+
+/* Words rise out of a mask, one after another. */
+.mw { display: inline-block; overflow: hidden; vertical-align: top; padding-bottom: 0.16em; margin-bottom: -0.16em; }
+.mw__in {
+  display: inline-block;
+  transform: translate3d(0, 112%, 0);
+  transition: transform var(--t0) var(--ease-soft);
+  transition-delay: calc(var(--dly) + var(--wi, 0) * 110ms);
+}
+.leaf.is-entered .mw__in { transform: none; }
+
+/* Handwriting is written on, left to right. */
+.leaf [data-fx="wipe"] { clip-path: inset(-0.3em 100% -0.3em -0.2em); transition: clip-path var(--t0) var(--ease-slow); transition-delay: var(--dly); }
+.leaf.is-entered [data-fx="wipe"] { clip-path: inset(-0.3em -0.4em -0.3em -0.2em); }
+
+/* Photographs: a curtain of paper lifts and the picture settles from a gentle zoom. */
+.photo__reveal {
+  scale: 1.16;
+  transition: scale calc(var(--t, 1500ms) * var(--tk) * 1.7) var(--ease-slow);
+  transition-delay: calc(var(--base) + var(--rd, 0ms) + var(--d, 0ms));
+}
+.leaf.is-entered .photo__reveal { scale: 1; }
+.photo__veil {
+  position: absolute; inset: 0; z-index: 2; background-color: #f1e9d8;
+  transform-origin: 50% 0;
+  transition: transform calc(var(--t, 1500ms) * var(--tk)) var(--ease-slow);
+  transition-delay: calc(var(--base) + var(--rd, 0ms) + var(--d, 0ms));
+}
+.photo[data-reveal="left"] .photo__veil { transform-origin: 0 50%; }
+.photo[data-reveal="fade"] .photo__veil { display: none; }
+.photo[data-reveal="develop"] .photo__veil {          /* a print slowly developing out of darkness */
+  background-color: #1b110e; transform: none;
+  transition: opacity calc(var(--t, 1500ms) * var(--tk)) cubic-bezier(0.4, 0, 0.3, 1);
+  transition-delay: calc(var(--base) + var(--rd, 0ms) + var(--d, 0ms));
+}
+.leaf.is-entered .photo[data-reveal="develop"] .photo__veil { opacity: 0; }
+.leaf.is-entered .photo[data-reveal="up"] .photo__veil { transform: scaleY(0); }
+.leaf.is-entered .photo[data-reveal="left"] .photo__veil { transform: scaleX(0); }
+
+/* Title & chapter keylines settle in; the closing page gathers a warm glow. */
+.page--title::before, .page--chapter::before {
+  opacity: 0; scale: 1.05;
+  transition: opacity calc(2200ms * var(--tk)) var(--ease-slow), scale calc(2600ms * var(--tk)) var(--ease-slow);
+  transition-delay: calc(var(--base) + 100ms);
+}
+.leaf.is-entered .page--title::before, .leaf.is-entered .page--chapter::before { opacity: 1; scale: 1; }
+
+.page--closing::before, .page--chapter::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(62% 46% at 50% 44%, rgba(214, 170, 110, 0.3), rgba(214, 170, 110, 0) 72%);
+  opacity: 0; scale: 0.82;
+  transition: opacity calc(4600ms * var(--tk)) ease, scale calc(7000ms * var(--tk)) var(--ease-slow);
+  transition-delay: 500ms;
+}
+.page--chapter::after { background: radial-gradient(50% 36% at 50% 38%, rgba(214, 170, 110, 0.2), rgba(214, 170, 110, 0) 72%); }
+.leaf.is-entered .page--closing::before, .leaf.is-entered .page--chapter::after { opacity: 1; scale: 1.06; }
+
+/* The sprig draws itself, then its leaves fill in. */
+.leaf.is-entered .sprig path {
+  stroke-dashoffset: 0;
+  fill: rgba(184, 147, 90, 0.14);
+}
+.sprig path {
+  transition: stroke-dashoffset 2400ms var(--ease-slow), fill 1600ms ease;
+  transition-delay: calc(var(--base) + var(--d, 0ms) + var(--pi, 0) * 280ms), calc(var(--base) + var(--d, 0ms) + 2200ms);
+}
+
+/* -- Idle motion: only on the page being looked at -------------------- */
+.leaf.is-current.is-entered .photo__reveal {
+  animation: drift 28s ease-in-out infinite alternate;
+  animation-delay: calc(var(--base) + var(--rd, 0ms) + var(--d, 0ms) + var(--t, 1500ms) * var(--tk) * 1.7);
+}
+@keyframes drift {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(var(--drift-x), var(--drift-y), 0) scale(calc(1 + var(--drift-s))); }
+}
+
+.leaf.is-current.is-entered .photo[data-sway] {
+  animation: sway 9s ease-in-out infinite alternate;
+  animation-delay: calc(var(--base) + var(--d, 0ms) + var(--t0) + var(--sway-delay, 0s));
+}
+@keyframes sway { from { rotate: 0deg; } to { rotate: var(--sway); } }
+
+.leaf.is-current.is-entered .sprig { animation: sprig 8s ease-in-out infinite alternate; transform-origin: 50% 100%; }
+@keyframes sprig { from { rotate: -2deg; } to { rotate: 2.4deg; } }
+
+.leaf.is-current.is-entered .note__spark::after {
+  content: ""; position: absolute; inset: -1px; border-radius: 50%; border: 1px solid var(--gold);
+  animation: ripple 3.2s ease-out infinite; animation-delay: 5s;
+}
+@keyframes ripple { from { transform: scale(1); opacity: 0.7; } to { transform: scale(3.2); opacity: 0; } }
+
+.leaf.is-current.is-entered .page--closing::before { animation: glow 11s ease-in-out infinite alternate; animation-delay: 7.5s; }
+@keyframes glow { from { opacity: 1; } to { opacity: 0.7; } }
+
+/* Paper: the page breathes against its binding, and settles when it lands. */
+.leaf__face { transform-origin: 0 50%; }
+.leaf.is-current.is-entered.is-landed-a .leaf__face { animation: land 760ms var(--ease-soft); }
+.leaf.is-current.is-entered.is-landed-b .leaf__face { animation: land-b 760ms var(--ease-soft); }
+@media (min-width: 768px) {
+  .leaf.is-current.is-entered .leaf__face { animation: breath 11s ease-in-out infinite alternate; }
+  .leaf.is-current.is-entered.is-landed-a .leaf__face { animation: breath 11s ease-in-out infinite alternate, land 760ms var(--ease-soft); }
+  .leaf.is-current.is-entered.is-landed-b .leaf__face { animation: breath 11s ease-in-out infinite alternate, land-b 760ms var(--ease-soft); }
+}
+@keyframes breath {
+  from { transform: rotate(-0.07deg) translate3d(0, 0, 0); }
+  to   { transform: rotate(0.09deg) translate3d(0, 0.5px, 0); }
+}
+@keyframes land {
+  0%   { transform: translate3d(0, -2px, 0) rotate(-0.2deg); }
+  38%  { transform: translate3d(0, 1px, 0) rotate(0.1deg); }
+  68%  { transform: translate3d(0, -0.4px, 0) rotate(-0.03deg); }
+  100% { transform: none; }
+}
+@keyframes land-b {
+  0%   { transform: translate3d(0, -2px, 0) rotate(-0.2deg); }
+  38%  { transform: translate3d(0, 1px, 0) rotate(0.1deg); }
+  68%  { transform: translate3d(0, -0.4px, 0) rotate(-0.03deg); }
+  100% { transform: none; }
+}
+
+/* A page that comes back onto the stack was already seen: show it complete. */
+.leaf.is-instant *, .leaf.is-instant *::before, .leaf.is-instant *::after,
+.leaf.is-reset *, .leaf.is-reset *::before, .leaf.is-reset *::after {
+  transition-duration: 0s !important; transition-delay: 0s !important;
+}
+.leaf.is-reset *, .leaf.is-reset *::before, .leaf.is-reset *::after { animation: none !important; }
+
+/* -- Light & grain over the whole book ------------------------------------ */
+.fx-light {
+  position: absolute; inset: 0; z-index: 90; overflow: hidden; pointer-events: none;
+  border-radius: 1px 3px 3px 1px; opacity: 0.8;
+  transition: opacity 2.4s ease;
+}
+.album[data-layout="chapter"] .fx-light { opacity: 1; }
+.album[data-layout="closing"] .fx-light { opacity: 1; }
+.album[data-layout="full"] .fx-light { opacity: 0.55; }
+.fx-light__follow { position: absolute; inset: 0; }
+.fx-light__blob {
+  position: absolute; left: -35%; top: -30%; width: 125%; height: 95%;
+  background: radial-gradient(closest-side, rgba(255, 224, 168, 0.3), rgba(255, 224, 168, 0));
+  animation: light 18s ease-in-out infinite alternate;
+}
+@keyframes light {
+  0%   { transform: translate3d(0, 0, 0) scale(1); opacity: 0.55; }
+  50%  { transform: translate3d(34%, 18%, 0) scale(1.18); opacity: 0.9; }
+  100% { transform: translate3d(64%, 34%, 0) scale(1); opacity: 0.5; }
+}
+
+.fx-grain { position: absolute; inset: 0; z-index: 4; overflow: hidden; pointer-events: none; }
+.fx-grain::before {
+  content: ""; position: absolute; inset: -180px;
+  background-image: var(--grain); background-size: 180px 180px;
+  opacity: 0.1;
+  animation: grain 1.2s steps(1, end) infinite;
+}
+@keyframes grain {
+  0%   { transform: translate3d(0, 0, 0); }
+  12%  { transform: translate3d(-47px, 31px, 0); }
+  25%  { transform: translate3d(29px, -62px, 0); }
+  37%  { transform: translate3d(-81px, -18px, 0); }
+  50%  { transform: translate3d(54px, 70px, 0); }
+  62%  { transform: translate3d(-22px, 96px, 0); }
+  75%  { transform: translate3d(83px, -37px, 0); }
+  87%  { transform: translate3d(-66px, 52px, 0); }
+}
+@media (max-width: 767px) {
+  .fx-grain::before { opacity: 0.075; animation: none; }      /* static grain on phones: no constant GPU work */
+  .fx-light__blob { animation-duration: 36s; }
+}
+:root[data-lite] .fx-grain::before { animation: none; }
+:root[data-lite] .fx-light__blob { animation-duration: 30s; }
+
+/* ---------- 10. Reduced motion ----------
+   Set by script.js (OS preference, or motion.quality: 'off').
+   No travel, no zoom, no parallax, no particles, no looping: content simply
+   fades in, and pages cross-fade instead of turning. */
+:root[data-reduced] { --dur: 1ms; }
+:root[data-reduced] .gate, :root[data-reduced] .album, :root[data-reduced] .progress,
+:root[data-reduced] .btn, :root[data-reduced] .btn::after, :root[data-reduced] .book {
+  transition-duration: 1ms !important; transition-delay: 0s !important;
+}
+:root[data-reduced] .leaf [data-fx] {
+  translate: none !important; rotate: none !important; scale: none !important; filter: none !important;
+  opacity: 0;
+  transition: opacity 600ms ease !important;
+  transition-delay: 120ms !important;
+}
+:root[data-reduced] .leaf.is-entered [data-fx] { opacity: 1; }
+:root[data-reduced] .leaf [data-fx="words"] { opacity: 1; }
+:root[data-reduced] .mw__in { transform: none !important; opacity: 0; transition: opacity 600ms ease !important; transition-delay: 120ms !important; }
+:root[data-reduced] .leaf.is-entered .mw__in { opacity: 1; }
+:root[data-reduced] .photo[data-reveal="up"] .photo__veil, :root[data-reduced] .photo[data-reveal="left"] .photo__veil,
+:root[data-reduced] .fx-canvas, :root[data-reduced] .fx-grain::before,
+:root[data-reduced] .note__spark, :root[data-reduced] .note__sprig { display: none !important; }
+:root[data-reduced] .photo__reveal, :root[data-reduced] .page::before, :root[data-reduced] .page::after,
+:root[data-reduced] .tl__row::before, :root[data-reduced] .list__item::after {
+  scale: none !important; transition: none !important;
+}
+:root[data-reduced] .page--title::before, :root[data-reduced] .page--chapter::before { opacity: 1; scale: none; }
+:root[data-reduced] .page--closing::before, :root[data-reduced] .page--chapter::after { opacity: 1; scale: none; animation: none !important; }
+:root[data-reduced] .leaf [data-fx="wipe"] { clip-path: none !important; }
+:root[data-reduced] .tl__line, :root[data-reduced] .tl__node { display: none; }
+:root[data-reduced] .slot { transition-duration: 1ms !important; }
+:root[data-reduced] .leaf *, :root[data-reduced] .leaf *::before, :root[data-reduced] .leaf *::after,
+:root[data-reduced] .fx-light__blob, :root[data-reduced] .leaf__face { animation: none !important; }
+:root[data-reduced] .photo__reveal { inset: 0; }
+
+/* The finale in reduced motion: the same beats, compressed, as plain fades. */
+:root[data-reduced] .page--finale *, :root[data-reduced] .finale__photo {
+  transition-duration: 0.7s !important; transition-delay: 0s !important; translate: none !important; scale: none !important;
+}
+:root[data-reduced] .page--finale .fn__in { transform: none !important; }
+:root[data-reduced] .page--finale .fn { overflow: visible; }
+:root[data-reduced] .page--finale .photo__veil { transition-duration: 1.4s !important; }
+:root[data-reduced] .album .album__bar > *, :root[data-reduced] .album .album__nav > * { transition-duration: 0.7s !important; }
+
+/* Reduced motion: the cover fades instead of swinging open. */
+:root[data-reduced] .cover { transform: none !important; transition: none !important; }
+:root[data-reduced] .cover__shade { display: none; }
+:root[data-reduced] body[data-view="album"] .gate { opacity: 0; transition: opacity 0.5s ease, visibility 0s linear 0.5s; }
+:root[data-reduced] .gate::before { transition-duration: 0.5s !important; transition-delay: 0s !important; }
