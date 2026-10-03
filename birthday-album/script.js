@@ -1797,16 +1797,20 @@
     let acc = 0;
     let locked = false;
     let quiet = 0;
+    let lastTurn = 0;
     stage.addEventListener('wheel', (e) => {
       if (album.view !== 'album') return;
       if (Math.abs(e.deltaX) <= Math.abs(e.deltaY) * 1.2) return; // vertical: not ours
       e.preventDefault();
       clearTimeout(quiet);
-      quiet = setTimeout(() => { locked = false; acc = 0; }, 150); // gesture + momentum over
-      if (locked) return;
+      // One gesture = one page. A gesture (and its momentum tail) ends after a quiet moment, and never
+      // within half a second of the last turn, so a slow or stuttering stream cannot turn two pages.
+      quiet = setTimeout(() => { locked = false; acc = 0; }, 260);
+      if (locked || now() - lastTurn < 500) return;
       acc += e.deltaX;
       if (Math.abs(acc) > 70) {
         locked = true;
+        lastTurn = now();
         if (acc > 0) album.next('wheel'); else album.prev('wheel');
         acc = 0;
       }
