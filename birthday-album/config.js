@@ -70,7 +70,7 @@ window.ALBUM_CONFIG = {
        list         "little things" — a handwritten list  items[], photo (optional)
        timeline     moments set along a gold line         photos[4]
        polaroids    instant prints with written borders   photos[4]
-       interactive  a loose pile — tap one to bring it forward  photos[6]
+       interactive  a proof sheet — tap a frame to bring it forward  photos[6]
        finale       the last page: one photograph, a slow reveal, your message  photo, message
        (also: title, chapter, note, closing — simple typographic pages)
 

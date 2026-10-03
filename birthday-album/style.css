@@ -35,6 +35,17 @@
   --pad: clamp(20px, 6vw, 48px);       /* page padding */
   --measure: 36rem;                     /* comfortable text width */
 
+  /* Page type scale (container units: scales with the page, not the viewport) */
+  --t-title: clamp(1.4rem, 8cqw, 2.1rem);          /* page headings */
+  --t-lead: clamp(1.05rem, 5.5cqw, 1.55rem);       /* italic serif lines */
+  --t-hand: clamp(1.05rem, 5.4cqw, 1.5rem);        /* handwritten captions */
+  --t-hand-l: clamp(1.15rem, 6.4cqw, 1.8rem);      /* the larger handwritten line on a page */
+  --t-body: clamp(0.95rem, 4.5cqw, 1.2rem);        /* small serif text */
+  --t-read: clamp(1.05rem, 5cqw, 1.5rem);          /* text meant to be read: the note, the finale */
+  /* Page spacing */
+  --gap-s: clamp(8px, 3cqw, 16px);
+  --gap-m: clamp(12px, 5cqw, 24px);
+
   --safe-t: env(safe-area-inset-top, 0px);
   --safe-r: env(safe-area-inset-right, 0px);
   --safe-b: env(safe-area-inset-bottom, 0px);
@@ -68,6 +79,8 @@ body {
 }
 
 h1, h2, p, figure { margin: 0; }
+h1, h2 { text-wrap: balance; }            /* no single word stranded on the last line of a heading */
+p { text-wrap: pretty; }
 button { font: inherit; color: inherit; margin: 0; }
 img { display: block; max-width: 100%; }
 [hidden] { display: none !important; }
@@ -156,17 +169,33 @@ img { display: block; max-width: 100%; }
   z-index: 20;
   display: grid;
   place-items: center;
-  background: var(--ink);
-  transition: opacity 0.8s var(--ease), visibility 0s;
+  perspective: 2400px;
+  perspective-origin: 12% 50%;
+}
+.gate::before {             /* the dark ground; it clears as the cover swings open */
+  content: "";
+  position: absolute; inset: 0;
+  background-color: var(--ink);
+  transition: opacity 1.4s var(--ease) 0.2s;
 }
 
 .cover {
   position: relative;
+  z-index: 1;
   width: 100%;
   height: 100%;
   overflow-y: auto;
   background-color: var(--wine);
   color: var(--ivory);
+  transform-origin: 0 50%;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transition: transform 1.7s var(--ease-slow);
+}
+.cover__shade {             /* the cover darkens as it turns away from the light */
+  position: absolute; inset: 0; z-index: 5; pointer-events: none;
+  background-color: #12060a; opacity: 0;
+  transition: opacity 1.7s ease;
 }
 .cover::before {            /* paper grain */
   content: "";
@@ -224,11 +253,11 @@ img { display: block; max-width: 100%; }
   opacity: 0.55;
 }
 
-[data-view="album"] .gate {
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.8s var(--ease), visibility 0s linear 0.8s;
-}
+/* Opening the album: the cover swings open on its spine to reveal the first page. */
+[data-view="album"] .gate { visibility: hidden; pointer-events: none; transition: visibility 0s linear 1.8s; }
+[data-view="album"] .gate::before { opacity: 0; }
+[data-view="album"] .cover { transform: rotateY(-104deg); }
+[data-view="album"] .cover__shade { opacity: 0.8; }
 
 /* ---------- 5. Album chrome ---------- */
 .album {
@@ -239,12 +268,12 @@ img { display: block; max-width: 100%; }
   color: var(--ivory);
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.8s var(--ease) 0.15s, visibility 0s linear 0.95s;
+  transition: opacity 0.9s var(--ease), visibility 0s linear 0.9s;
 }
 [data-view="album"] .album {
   opacity: 1;
   visibility: visible;
-  transition: opacity 0.8s var(--ease) 0.15s, visibility 0s;
+  transition: opacity 1s var(--ease) 0.25s, visibility 0s;
 }
 
 /* The bar and nav sit above the book so a lifting page never covers them. */
@@ -525,13 +554,13 @@ img { display: block; max-width: 100%; }
   --print-shadow: 0 1px 1px rgba(24, 14, 6, 0.3), 0 4px 7px -2px rgba(24, 14, 6, 0.28), 0 14px 22px -10px rgba(24, 14, 6, 0.4);
   box-shadow: var(--print-shadow);
 }
-.photo--mat      { --mat: clamp(6px, 2.4cqw, 12px); background-color: #faf6ec; }
-.photo--polaroid { --mat: clamp(7px, 3.1cqw, 15px); --chin: clamp(36px, 14cqw, 66px); background-color: #fbf8ef; }
-.photo--frame    { --mat: clamp(3px, 1.1cqw, 6px);  background-color: #faf6ec; }
+.photo--mat      { --mat: clamp(6px, 2.4cqw, 12px); background-color: var(--stock, #faf6ec); }
+.photo--polaroid { --mat: clamp(7px, 3.1cqw, 15px); --chin: clamp(36px, 14cqw, 66px); background-color: var(--stock, #fbf8ef); }
+.photo--frame    { --mat: clamp(3px, 1.1cqw, 6px);  background-color: var(--stock, #faf6ec); }
 .photo--bleed    { --mat: 0px; }
 
 /* The surface of the card: a faint matte grain over the whole print. */
-.photo__paper { position: absolute; inset: 0; z-index: 3; pointer-events: none; background-image: var(--grain); opacity: 0.12; }
+.photo__paper { position: absolute; inset: 0; z-index: 3; pointer-events: none; background-image: var(--grain); opacity: 0.08; }
 
 /* The caption written on a polaroid's white border. */
 .photo__chin {
@@ -564,18 +593,6 @@ img { display: block; max-width: 100%; }
   display: flex;
   flex-direction: column;
 }
-.page__title {
-  font-family: var(--serif);
-  font-weight: 400;
-  font-size: clamp(1.35rem, 8cqw, 2.1rem);
-  line-height: 1.1;
-}
-.page__caption {
-  font-family: var(--serif);
-  font-style: italic;
-  font-size: clamp(1rem, 5cqw, 1.3rem);
-  line-height: 1.35;
-}
 .meta { display: flex; flex-wrap: wrap; gap: 0.2rem 1rem; }
 .meta__date { color: var(--ink); opacity: 0.6; }
 
@@ -602,7 +619,7 @@ img { display: block; max-width: 100%; }
   max-width: 17em;
   font-family: var(--serif);
   font-style: italic;
-  font-size: clamp(1.05rem, 5.4cqw, 1.45rem);
+  font-size: var(--t-lead);
   line-height: 1.4;
 }
 
@@ -636,13 +653,13 @@ img { display: block; max-width: 100%; }
 .memo[data-at="top"] { top: var(--m); bottom: auto; }
 .page.has-open .memo { opacity: 1; translate: none; }
 .memo p:empty { display: none; }
-.memo__cap { font-size: clamp(1.1rem, 6cqw, 1.6rem); }
-.memo__desc { font-family: var(--serif); font-size: clamp(0.92rem, 4.2cqw, 1.12rem); line-height: 1.42; color: #4a3b33; }
+.memo__cap { font-size: var(--t-hand); }
+.memo__desc { font-family: var(--serif); font-size: var(--t-body); line-height: 1.42; color: #4a3b33; }
 .memo .tape { top: -2.4cqw; left: auto; right: 10%; margin: 0; width: 15cqw; height: 4.4cqw; transform: rotate(3deg); }
 
 /* 1 · opening ------------------------------------------------------- */
 .page--opening {
-  display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: clamp(8px, 3cqw, 16px);
+  display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: var(--gap-s);
   text-align: center; padding-top: calc(var(--m) * 0.9);
 }
 .opening__head { display: grid; gap: 0.2rem; justify-items: center; }
@@ -650,7 +667,7 @@ img { display: block; max-width: 100%; }
 .opening__print { min-height: 0; display: grid; place-items: center; padding-block: 2cqw; }
 .opening__print .slot { height: 100%; width: auto; max-width: 100%; }
 .opening__foot { display: grid; gap: 0.2rem; justify-items: center; }
-.opening__caption { font-size: clamp(1.2rem, 6.6cqw, 1.9rem); transform: rotate(-1.2deg); }
+.opening__caption { font-size: var(--t-hand-l); transform: rotate(-1.2deg); }
 
 /* 2 · collage, 6 · polaroids, 7 · interactive: free composition of prints */
 .page--collage, .page--polaroids, .page--interactive { padding: 0; }
@@ -665,7 +682,7 @@ img { display: block; max-width: 100%; }
   transition: opacity 0.5s ease; pointer-events: none;
 }
 .full__label .eyebrow, .full__label .meta__date { color: var(--ivory); opacity: 0.85; }
-.full__title { font-family: var(--serif); font-weight: 400; font-size: clamp(1.4rem, 8.5cqw, 2.3rem); line-height: 1.08; }
+.full__title { font-family: var(--serif); font-weight: 400; font-size: var(--t-title); line-height: 1.08; }
 .page.has-open .full__label { opacity: 0; }
 .full__scrim {
   position: absolute; z-index: 4; left: 0; right: 0; bottom: 0; height: 58%; pointer-events: none;
@@ -680,13 +697,13 @@ img { display: block; max-width: 100%; }
 .page--full .memo .tape { display: none; }
 
 /* 4 · little things I love about you ------------------------------- */
-.page--list { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: clamp(8px, 3cqw, 16px); }
+.page--list { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: var(--gap-s); }
 .list__head { display: grid; gap: 0.35rem; }
-.list__title { font-family: var(--serif); font-weight: 400; font-size: clamp(1.4rem, 8cqw, 2.05rem); line-height: 1.06; }
+.list__title { font-family: var(--serif); font-weight: 400; font-size: var(--t-title); line-height: 1.06; }
 .list__items { list-style: none; margin: 0; padding: 0; display: grid; align-content: space-evenly; min-height: 0; }
 .list__item {
   position: relative; display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 3.4cqw;
-  padding-block: 0.55em; font-family: var(--serif); font-size: clamp(0.95rem, 4.5cqw, 1.2rem); line-height: 1.28;
+  padding-block: 0.55em; font-family: var(--serif); font-size: var(--t-body); line-height: 1.28;
 }
 .list__num { font-family: var(--sans); font-size: 0.56em; letter-spacing: 0.2em; color: var(--gold-ink); }
 .list__item::after {
@@ -704,11 +721,11 @@ img { display: block; max-width: 100%; }
 /* 5 · timeline ---------------------------------------------------------- */
 .page--timeline { display: grid; grid-template-rows: auto minmax(0, 1fr); }
 .tl__head { display: grid; gap: 0.35rem; padding-bottom: clamp(8px, 3cqw, 16px); }
-.tl__heading { font-family: var(--serif); font-weight: 400; font-size: clamp(1.4rem, 8.5cqw, 2.2rem); line-height: 1.05; }
+.tl__heading { font-family: var(--serif); font-weight: 400; font-size: var(--t-title); line-height: 1.05; }
 .tl__rows { position: relative; display: grid; grid-template-rows: repeat(4, minmax(0, 1fr)); min-height: 0; }
 .tl__row {
   position: relative; display: grid; grid-template-columns: 31% 1fr; align-items: center; min-height: 0;
-  gap: clamp(12px, 5cqw, 24px); padding-block: clamp(5px, 1.8cqw, 9px);
+  gap: var(--gap-m); padding-block: clamp(5px, 1.8cqw, 9px);
 }
 .tl__row::before {
   content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1px; background: var(--hairline);
@@ -718,7 +735,7 @@ img { display: block; max-width: 100%; }
 .leaf.is-entered .tl__row::before { scale: 1; }
 .tl__row .slot { height: 100%; width: auto; max-width: 100%; justify-self: start; }
 .tl__text { display: grid; gap: 0.2rem; align-content: center; min-width: 0; }
-.tl__caption { font-size: clamp(1rem, 5.3cqw, 1.45rem); }
+.tl__caption { font-size: var(--t-hand); }
 .tl__line {
   position: absolute; z-index: 1; left: calc(-1 * var(--gut) - 6px); top: 5%; bottom: 5%; width: 1px; background: var(--gold);
 }
@@ -729,9 +746,15 @@ img { display: block; max-width: 100%; }
 }
 
 /* 7 · interactive ------------------------------------------------------- */
-.interactive__title { position: absolute; z-index: 2; left: calc(var(--m) + var(--gut)); top: calc(var(--m) * 0.55); font-size: clamp(1.15rem, 6.4cqw, 1.8rem); }
+.interactive__title { position: absolute; z-index: 2; left: calc(var(--m) + var(--gut)); top: calc(var(--m) * 0.55); font-size: var(--t-hand-l); }
 .interactive__hint { position: absolute; z-index: 2; left: 0; right: 0; bottom: calc(var(--m) * 0.55); text-align: center; color: var(--gold-ink); transition: opacity 0.5s ease; }
-.page--interactive.has-open .slot:not(.is-open) { opacity: 0.22; }
+.page--interactive.has-open .slot:not(.is-open) { opacity: 0.2; }
+.leaf[data-tone="proof"] .leaf__face { background-color: #e8dfca; }
+.slot__no {                                  /* the small number under each frame of the proof sheet */
+  position: absolute; left: 0; top: calc(100% + 1.6cqw);
+  font-family: var(--sans); font-size: 0.5625rem; font-weight: 500; letter-spacing: 0.22em; color: var(--gold-ink);
+}
+.page--interactive .photo--frame { --mat: clamp(4px, 1.4cqw, 7px); }
 .page.has-open .interactive__hint { opacity: 0 !important; transition-delay: 0s !important; }
 
 /* 8 · the finale -------------------------------------------------------
@@ -746,7 +769,6 @@ img { display: block; max-width: 100%; }
 /* The photograph: dark until the greeting, then it slowly develops and settles. */
 .finale__photo { position: absolute; z-index: 1; inset: 0; width: 100%; height: 100%; opacity: 0; transition: opacity 3.2s ease; }
 .page--finale:is([data-scene="greeting"], [data-scene="message"], [data-scene="end"]) .finale__photo { opacity: 1; }
-.page--finale .photo__sheen { display: none; }
 .page--finale .photo__missing { background-color: #2a1a14; }
 .page--finale .photo__missing span { opacity: 0; }   /* a missing photo is just a warm dark ground here */
 .page--finale .photo[data-reveal="develop"] .photo__veil {
@@ -785,7 +807,7 @@ img { display: block; max-width: 100%; }
 }
 .page--finale:is([data-scene="message"], [data-scene="end"]) .finale__greet { opacity: 0; }
 .finale__hb {
-  font-family: var(--serif); font-style: italic; font-weight: 300; font-size: clamp(1.1rem, 5.8cqw, 1.75rem); color: var(--gold-on-wine);
+  font-family: var(--serif); font-style: italic; font-weight: 300; font-size: var(--t-lead); color: var(--gold-on-wine);
   opacity: 0; translate: 0 8px; transition: opacity 1.8s ease, translate 2.4s var(--ease-soft);
 }
 .page--finale:is([data-scene="greeting"], [data-scene="message"], [data-scene="end"]) .finale__hb { opacity: 1; translate: none; }
@@ -813,14 +835,14 @@ img { display: block; max-width: 100%; }
 .page--finale:is([data-scene="message"], [data-scene="end"]) .finale__scroll { opacity: 1; visibility: visible; transition: opacity 1.8s ease 1.3s, visibility 0s; }
 .finale__inner { width: 100%; max-width: 30rem; margin: auto; }
 .finale__p {
-  margin: 0 0 1.4em; font-family: var(--serif); font-weight: 400; font-size: clamp(1.05rem, 5cqw, 1.5rem); line-height: 1.62;
+  margin: 0 0 1.4em; font-family: var(--serif); font-weight: 400; font-size: var(--t-read); line-height: 1.62;
   color: rgba(243, 237, 224, 0.95); text-shadow: 0 1px 14px rgba(0, 0, 0, 0.55);
 }
 .fs { opacity: 0; transition: opacity 2.2s ease; }
 .fs.is-in { opacity: 1; }
 .finale__end { display: grid; justify-items: center; gap: 1.1rem; margin-top: 2.4em; text-align: center; opacity: 0; transition: opacity 2.6s ease; }
 .finale__end.is-in { opacity: 1; }
-.finale__closing { margin: 0; font-family: var(--serif); font-style: italic; font-weight: 300; font-size: clamp(1.1rem, 5.6cqw, 1.65rem); line-height: 1.35; color: var(--gold-on-wine); }
+.finale__closing { margin: 0; font-family: var(--serif); font-style: italic; font-weight: 300; font-size: var(--t-lead); line-height: 1.35; color: var(--gold-on-wine); }
 .finale__again {
   min-height: 44px; margin-top: 0.4rem; padding: 0.5rem 0.2rem; border: 0; border-bottom: 1px solid rgba(184, 147, 90, 0.55); background: none; cursor: pointer;
   font-family: var(--sans); font-size: 0.6875rem; font-weight: 500; letter-spacing: 0.24em; text-transform: uppercase; color: rgba(243, 237, 224, 0.62);
@@ -848,16 +870,16 @@ img { display: block; max-width: 100%; }
 }
 .chapter__numeral { font-family: var(--serif); font-weight: 300; font-size: clamp(5rem, 54cqw, 12rem); line-height: 0.8; color: var(--gold); }
 .chapter__text { display: grid; justify-items: center; gap: 1rem; }
-.chapter__title { font-family: var(--serif); font-weight: 400; font-size: clamp(1.6rem, 9.5cqw, 2.6rem); line-height: 1.05; }
-.chapter__caption { max-width: 16em; font-family: var(--serif); font-style: italic; font-size: clamp(1rem, 5cqw, 1.3rem); color: var(--gold-on-wine); }
+.chapter__title { font-family: var(--serif); font-weight: 400; font-size: var(--t-title); line-height: 1.05; }
+.chapter__caption { max-width: 16em; font-family: var(--serif); font-style: italic; font-size: var(--t-lead); color: var(--gold-on-wine); }
 
 /* note: the written message ----------------------------------------- */
 .page--note { justify-content: center; gap: clamp(14px, 5cqw, 26px); }
-.page--note .page__inner, .note__body { max-width: 100%; }
+.note__body { max-width: 100%; }
 .note__body { display: grid; gap: 0.9em; }
-.note__p { font-family: var(--serif); font-size: clamp(1.05rem, 5.6cqw, 1.5rem); line-height: 1.5; }
+.note__p { font-family: var(--serif); font-size: var(--t-read); line-height: 1.5; }
 .note__sign { display: grid; gap: 0.2rem; }
-.note__signoff { font-family: var(--serif); font-style: italic; font-size: clamp(1rem, 5cqw, 1.3rem); }
+.note__signoff { font-family: var(--serif); font-style: italic; font-size: var(--t-lead); }
 .note__signature { justify-self: start; font-size: clamp(1.6rem, 9cqw, 2.4rem); }
 .note__sign { position: relative; }
 .note__spark { position: absolute; left: calc(100% - 4cqw); bottom: 0.9rem; width: 9px; height: 9px; border-radius: 50%; border: 1px solid var(--gold); }
@@ -868,7 +890,7 @@ img { display: block; max-width: 100%; }
 /* closing -------------------------------------------------------------- */
 .page--closing { align-items: center; justify-content: center; text-align: center; gap: clamp(14px, 6cqw, 28px); }
 .closing__heading { font-family: var(--serif); font-weight: 300; font-size: clamp(2.4rem, 17cqw, 4.8rem); line-height: 1; }
-.closing__text { font-family: var(--serif); font-style: italic; font-size: clamp(1.05rem, 5.4cqw, 1.45rem); color: var(--gold-on-wine); }
+.closing__text { font-family: var(--serif); font-style: italic; font-size: var(--t-lead); color: var(--gold-on-wine); }
 .btn--onwine { margin-top: 0.5rem; }
 
 /* ---------- 8. Breakpoints ---------- */
@@ -944,7 +966,7 @@ img { display: block; max-width: 100%; }
 :root {
   --ease-soft: cubic-bezier(0.2, 0.7, 0.2, 1);
   --ease-slow: cubic-bezier(0.45, 0, 0.15, 1);
-  --base: 220ms;            /* wait before a page's storyboard starts */
+  --base: 160ms;            /* wait before a page's storyboard starts */
   --tk: 1;                  /* duration multiplier by tier */
   --fx-dist: 26px;          /* how far things travel when they arrive */
   --fx-blur: 6px;
@@ -1005,8 +1027,7 @@ img { display: block; max-width: 100%; }
 .leaf [data-fx="wipe"] { clip-path: inset(-0.3em 100% -0.3em -0.2em); transition: clip-path var(--t0) var(--ease-slow); transition-delay: var(--dly); }
 .leaf.is-entered [data-fx="wipe"] { clip-path: inset(-0.3em -0.4em -0.3em -0.2em); }
 
-/* Photographs: a curtain of paper lifts, the picture settles from a gentle zoom,
-   and a band of light crosses it once. */
+/* Photographs: a curtain of paper lifts and the picture settles from a gentle zoom. */
 .photo__reveal {
   scale: 1.16;
   transition: scale calc(var(--t, 1500ms) * var(--tk) * 1.7) var(--ease-slow);
@@ -1029,14 +1050,6 @@ img { display: block; max-width: 100%; }
 .leaf.is-entered .photo[data-reveal="develop"] .photo__veil { opacity: 0; }
 .leaf.is-entered .photo[data-reveal="up"] .photo__veil { transform: scaleY(0); }
 .leaf.is-entered .photo[data-reveal="left"] .photo__veil { transform: scaleX(0); }
-.photo__sheen {
-  position: absolute; z-index: 3; top: -10%; bottom: -10%; left: 0; width: 55%; pointer-events: none;
-  background: linear-gradient(100deg, rgba(255, 244, 214, 0), rgba(255, 244, 214, 0.28) 50%, rgba(255, 244, 214, 0));
-  transform: translate3d(-140%, 0, 0) skewX(-14deg);
-  transition: transform calc(var(--t, 1500ms) * var(--tk) * 1.9) var(--ease-slow);
-  transition-delay: calc(var(--base) + var(--rd, 0ms) + var(--d, 0ms) + var(--t, 1500ms) * var(--tk) * 0.45);
-}
-.leaf.is-entered .photo__sheen { transform: translate3d(260%, 0, 0) skewX(-14deg); }
 
 /* Title & chapter keylines settle in; the closing page gathers a warm glow. */
 .page--title::before, .page--chapter::before {
@@ -1165,7 +1178,10 @@ img { display: block; max-width: 100%; }
   75%  { transform: translate3d(83px, -37px, 0); }
   87%  { transform: translate3d(-66px, 52px, 0); }
 }
-@media (max-width: 767px) { .fx-grain::before { opacity: 0.075; animation-duration: 1.6s; } }
+@media (max-width: 767px) {
+  .fx-grain::before { opacity: 0.075; animation: none; }      /* static grain on phones: no constant GPU work */
+  .fx-light__blob { animation-duration: 36s; }
+}
 :root[data-lite] .fx-grain::before { animation: none; }
 :root[data-lite] .fx-light__blob { animation-duration: 30s; }
 
@@ -1188,7 +1204,7 @@ img { display: block; max-width: 100%; }
 :root[data-reduced] .leaf [data-fx="words"] { opacity: 1; }
 :root[data-reduced] .mw__in { transform: none !important; opacity: 0; transition: opacity 600ms ease !important; transition-delay: 120ms !important; }
 :root[data-reduced] .leaf.is-entered .mw__in { opacity: 1; }
-:root[data-reduced] .photo__sheen, :root[data-reduced] .photo[data-reveal="up"] .photo__veil, :root[data-reduced] .photo[data-reveal="left"] .photo__veil,
+:root[data-reduced] .photo[data-reveal="up"] .photo__veil, :root[data-reduced] .photo[data-reveal="left"] .photo__veil,
 :root[data-reduced] .fx-canvas, :root[data-reduced] .fx-grain::before,
 :root[data-reduced] .note__spark, :root[data-reduced] .note__sprig { display: none !important; }
 :root[data-reduced] .photo__reveal, :root[data-reduced] .page::before, :root[data-reduced] .page::after,
@@ -1212,3 +1228,9 @@ img { display: block; max-width: 100%; }
 :root[data-reduced] .page--finale .fn { overflow: visible; }
 :root[data-reduced] .page--finale .photo__veil { transition-duration: 1.4s !important; }
 :root[data-reduced] .album .album__bar > *, :root[data-reduced] .album .album__nav > * { transition-duration: 0.7s !important; }
+
+/* Reduced motion: the cover fades instead of swinging open. */
+:root[data-reduced] .cover { transform: none !important; transition: none !important; }
+:root[data-reduced] .cover__shade { display: none; }
+:root[data-reduced] body[data-view="album"] .gate { opacity: 0; transition: opacity 0.5s ease, visibility 0s linear 0.5s; }
+:root[data-reduced] .gate::before { transition-duration: 0.5s !important; transition-delay: 0s !important; }

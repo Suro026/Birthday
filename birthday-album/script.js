@@ -216,11 +216,15 @@
      ------------------------------------------------------------------------ */
   const text = (tag, cls, value) => (value ? h(tag, { class: cls, text: value }) : null);
 
+  /* All storyboard delays below are written at a relaxed pace and tightened here, in one place. */
+  const STAGE = 0.78;
+  const tighten = (ms) => Math.round(ms * STAGE);
+
   /** Tag an element for the entrance choreography. kinds: rise | fade | drop | draw | wipe | words */
   function fx(el, kind, delay = 0, time = 0) {
     if (!el) return el;
     el.dataset.fx = kind;
-    if (delay) el.style.setProperty('--d', `${delay}ms`);
+    if (delay) el.style.setProperty('--d', `${tighten(delay)}ms`);
     if (time) el.style.setProperty('--t', `${time}ms`);
     return el;
   }
@@ -340,14 +344,14 @@
     }, [
       h('div', { class: 'photo__well' }, [
         stage,
-        h('span', { class: 'photo__sheen', 'aria-hidden': 'true' }),
         h('span', { class: 'photo__veil', 'aria-hidden': 'true' }),
       ]),
       frame === 'polaroid' && mem.caption ? h('figcaption', { class: 'photo__chin hand', text: mem.caption }) : null,
       frame === 'polaroid' || frame === 'mat' ? h('span', { class: 'photo__paper', 'aria-hidden': 'true' }) : null,
     ]);
     if (sway) el.dataset.sway = '';
-    el.style.setProperty('--d', `${delay}ms`);
+    el.style.setProperty('--stock', STOCKS[n % STOCKS.length]); // no two cards are quite the same cream
+    el.style.setProperty('--d', `${tighten(delay)}ms`);
     el.style.setProperty('--t', `${time}ms`);
     if (kind) el.dataset.fx = kind;
     return { el, img };
@@ -358,7 +362,7 @@
    *   flow   true = take part in normal layout; false = absolutely positioned by x/y/w
    *   tapes  strips of tape holding it down ('top', 'corner', 'both' or '')
    */
-  function printSlot(mem, ctx, figOpts, { flow = false, interactive = true, tapeDelay = 900, lift = 1.07 } = {}) {
+  function printSlot(mem, ctx, figOpts, { flow = false, interactive = true, tapeDelay = 900, lift = 1.07, label = '' } = {}) {
     const fig = photoFigure(mem, ctx, figOpts);
     const [a, b] = String(mem.ratio).split('/').map(Number);
     const slot = h('div', { class: `slot${flow ? ' slot--flow' : ''}` }, [fig.el]);
@@ -373,6 +377,7 @@
     for (const kind of mem.tape === 'both' ? ['top', 'corner'] : mem.tape ? [mem.tape] : []) {
       slot.append(fx(h('span', { class: `tape tape--${kind}`, 'aria-hidden': 'true' }), 'fade', tapeDelay, 700));
     }
+    if (label) slot.append(fx(h('span', { class: 'slot__no', 'aria-hidden': 'true', text: label }), 'fade', tapeDelay, 600));
     const hasText = mem.caption || mem.description || mem.date;
     if (interactive && hasText) {
       Object.assign(slot.dataset, {
@@ -397,6 +402,8 @@
     h('p', { class: 'hand memo__cap' }),
     h('p', { class: 'memo__desc' }),
   ]);
+
+  const STOCKS = ['#faf6ec', '#f6efdf', '#fcfaf3', '#f3ebd9'];
 
   const metaLine = (ctx, date) =>
     h('p', { class: 'eyebrow meta' }, [
@@ -443,18 +450,19 @@
       { x: 32, y: 71, w: 30, ratio: '1/1', rotation: 2.4,  tape: 'corner' },
     ],
     polaroids: [
-      { x: 11, y: 6,  w: 45, ratio: '5/6', rotation: -3.2, tape: 'top' },
-      { x: 51, y: 14, w: 41, ratio: '5/6', rotation: 2.6 },
-      { x: 9,  y: 47, w: 40, ratio: '5/6', rotation: 1.8,  tape: 'corner' },
-      { x: 47, y: 52, w: 43, ratio: '5/6', rotation: -2.1, tape: 'top' },
+      { x: 10, y: 5,  w: 47, ratio: '5/6', rotation: -3.2, tape: 'top' },
+      { x: 51, y: 12, w: 42, ratio: '5/6', rotation: 2.6 },
+      { x: 8,  y: 46, w: 42, ratio: '5/6', rotation: 1.8,  tape: 'corner' },
+      { x: 46, y: 51, w: 46, ratio: '5/6', rotation: -2.1, tape: 'top' },
     ],
+    // a tidy proof sheet: two columns of square frames, almost straight
     interactive: [
-      { x: 14, y: 14, w: 32, ratio: '4/5', rotation: -3 },
-      { x: 54, y: 12, w: 30, ratio: '4/5', rotation: 2.4 },
-      { x: 12, y: 39, w: 30, ratio: '4/5', rotation: 2 },
-      { x: 52, y: 37, w: 34, ratio: '4/5', rotation: -2.5 },
-      { x: 16, y: 61, w: 32, ratio: '4/5', rotation: -1.4 },
-      { x: 56, y: 60, w: 28, ratio: '4/5', rotation: 3 },
+      { x: 15, y: 13,   w: 31, ratio: '1/1', rotation: -0.4 },
+      { x: 55, y: 13.4, w: 31, ratio: '1/1', rotation: 0.5 },
+      { x: 15, y: 39.6, w: 31, ratio: '1/1', rotation: 0.4 },
+      { x: 55, y: 39,   w: 31, ratio: '1/1', rotation: -0.5 },
+      { x: 15, y: 66,   w: 31, ratio: '1/1', rotation: -0.3 },
+      { x: 55, y: 66.4, w: 31, ratio: '1/1', rotation: 0.4 },
     ],
   };
 
@@ -548,7 +556,7 @@
             h('span', { class: 'list__num', 'aria-hidden': 'true', text: pad2(i + 1) }),
             h('span', { class: 'list__text', text: typeof item === 'string' ? item : item.text }),
           ]);
-          li.style.setProperty('--rd', `${900 + i * 560}ms`);
+          li.style.setProperty('--rd', `${tighten(900 + i * 560)}ms`);
           fx(li, 'rise', 0, 1100);
           li.dataset.line = '';
           return li;
@@ -575,7 +583,7 @@
             hand('p', 'tl__caption', mem.caption, 560, 1300),
           ]),
         ]);
-        row.style.setProperty('--rd', `${900 + i * 850}ms`);
+        row.style.setProperty('--rd', `${tighten(900 + i * 850)}ms`);
         return { row, img: s.img };
       });
       const el = h('div', { class: 'page page--timeline' }, [
@@ -609,27 +617,25 @@
       return result('polaroids', spec, el, slots.map((s) => s.img));
     },
 
-    /* 7 · Interactive memory: a loose pile of small prints. Tap one and it comes
-       forward while the rest step back. */
+    /* 7 · Interactive memory: a proof sheet of small frames. Tap one and it comes
+       forward while the rest step back — an orderly page after the scattered ones. */
     interactive(spec, ctx) {
       const mems = memoriesOf(spec, PRESETS.interactive);
       const slots = mems.map((mem, i) => {
         const s = printSlot(mem, ctx, {
-          frame: 'mat', kind: 'drop', reveal: 'fade',
-          delay: 700 + i * 380, time: 1100, depth: 4, sway: i % 2 === 0, sizes: '(min-width: 768px) 20vw, 34vw',
-        }, { tapeDelay: 99999, lift: 1 });
+          frame: 'frame', kind: 'rise', reveal: 'fade',
+          delay: 700 + i * 300, time: 1100, depth: 4, sizes: '(min-width: 768px) 20vw, 34vw',
+        }, { tapeDelay: 700 + i * 300 + 500, lift: 1, label: pad2(i + 1) });
         s.el.style.setProperty('--z', String(i + 1));
-        s.el.firstChild.style.setProperty('--fx-r', `${(i % 2 ? 1 : -1) * 4}deg`);
-        s.el.firstChild.style.setProperty('--sway-delay', `${i * 0.9}s`);
         return s;
       });
       const el = h('div', { class: 'page page--interactive', dataset: { mode: 'lift' } }, [
         hand('p', 'interactive__title', spec.heading, 150, 1500),
         ...slots.map((s) => s.el),
-        fx(text('p', 'interactive__hint eyebrow', spec.hint), 'fade', 3200, 1400),
+        fx(text('p', 'interactive__hint eyebrow', spec.hint), 'fade', 2600, 1400),
         memoSlip(),
       ]);
-      return result('interactive', { heading: spec.heading }, el, slots.map((s) => s.img));
+      return result('interactive', { heading: spec.heading }, el, slots.map((s) => s.img), 'proof');
     },
 
     /* 8 · The finale. One photograph, almost no ornament, and a slow sequence of scenes
@@ -1463,7 +1469,7 @@
 
     /* ---- album open / close ---- */
     album.on('view', ({ view }) => {
-      if (view === 'album') { opening = performance.now() + 1100; book.refresh(); } else book.resetEntrances();
+      if (view === 'album') { opening = performance.now() + 1500; book.refresh(); } else book.resetEntrances();
     });
 
     fxs.onChange(() => {
@@ -1479,7 +1485,7 @@
         const el = leaves[i].el;
         el.classList.remove('is-reset');
         el.classList.toggle('is-instant', instant);
-        if (!instant && performance.now() < opening) el.style.setProperty('--base', '1000ms');
+        if (!instant && performance.now() < opening) el.style.setProperty('--base', '1100ms');
         else el.style.removeProperty('--base');
         el.classList.add('is-entered');
         startScene(i);

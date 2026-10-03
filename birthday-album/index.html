@@ -9,10 +9,13 @@
   <meta name="robots" content="noindex, nofollow">
   <link rel="icon" href="data:,">
 
-  <!-- Editorial type. Falls back to system serif/sans if offline. -->
+  <!-- Editorial type: Cormorant Garamond (text), Inter (small-caps labels), La Belle Aurore (handwriting).
+       Loaded without blocking the first paint; system serif/sans/cursive stand in until they arrive (or offline). -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Inter:wght@400;500&family=La+Belle+Aurore&display=swap">
+  <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Inter:wght@400;500&family=La+Belle+Aurore&display=swap">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Inter:wght@400;500&family=La+Belle+Aurore&display=swap"></noscript>
+
 
   <link rel="stylesheet" href="style.css">
 </head>
@@ -25,6 +28,7 @@
   <!-- ===== Opening screen: the cover of the book ===== -->
   <main class="gate screen" id="gate" aria-labelledby="cover-name">
     <div class="cover">
+      <span class="cover__shade" aria-hidden="true"></span>
       <div class="cover__inner">
         <p class="eyebrow cover__eyebrow" data-bind="cover.eyebrow"></p>
 
