@@ -734,19 +734,108 @@ img { display: block; max-width: 100%; }
 .page--interactive.has-open .slot:not(.is-open) { opacity: 0.22; }
 .page.has-open .interactive__hint { opacity: 0 !important; transition-delay: 0s !important; }
 
-/* 8 · final reveal ---------------------------------------------------- */
-.page--reveal {
-  display: grid; grid-template-rows: auto minmax(0, 1fr) auto; justify-items: center; text-align: center;
-  gap: clamp(8px, 3cqw, 18px); color: var(--ivory);
+/* 8 · the finale -------------------------------------------------------
+   Different on purpose: near-black, one photograph, almost no ornament, and slow.
+   script.js (createFinale) only switches data-scene on the page:
+     idle -> lead -> greeting -> message -> end
+   and everything below is how each scene looks. Delays live on the *destination*
+   scene's rule so that only arriving is staged, never leaving. */
+.leaf[data-tone="ink"] .leaf__face { background-color: #0a0406; color: var(--ivory); }
+.page--finale { display: block; padding: 0; background-color: #0a0406; color: var(--ivory); }
+
+/* The photograph: dark until the greeting, then it slowly develops and settles. */
+.finale__photo { position: absolute; z-index: 1; inset: 0; width: 100%; height: 100%; opacity: 0; transition: opacity 3.2s ease; }
+.page--finale:is([data-scene="greeting"], [data-scene="message"], [data-scene="end"]) .finale__photo { opacity: 1; }
+.page--finale .photo__sheen { display: none; }
+.page--finale .photo__missing { background-color: #2a1a14; }
+.page--finale .photo__missing span { opacity: 0; }   /* a missing photo is just a warm dark ground here */
+.page--finale .photo[data-reveal="develop"] .photo__veil {
+  background-color: #0a0406; transform: none; opacity: 1;
+  transition: opacity 8s cubic-bezier(0.4, 0, 0.3, 1); transition-delay: 0s;
 }
-.reveal__heading { font-family: var(--serif); font-weight: 300; font-size: clamp(2rem, 13cqw, 3.9rem); line-height: 1; }
-.reveal__print { width: 100%; min-height: 0; display: grid; place-items: center; padding-block: 2cqw; }
-.reveal__print .slot { height: 100%; width: auto; max-width: 100%; }
-.reveal__foot { display: grid; gap: 0.7rem; justify-items: center; }
-.reveal__line { color: var(--gold-on-wine); font-size: clamp(1.15rem, 6.2cqw, 1.7rem); }
-.page--reveal .memo { background-color: #2a0f17; color: var(--ivory); }
-.page--reveal .memo .hand, .page--reveal .memo__cap { color: var(--ivory); }
-.page--reveal .memo__desc { color: rgba(243, 237, 224, 0.85); }
+.leaf.is-entered .page--finale .photo[data-reveal="develop"] .photo__veil { opacity: 1; }
+.leaf.is-entered .page--finale:is([data-scene="greeting"], [data-scene="message"], [data-scene="end"]) .photo[data-reveal="develop"] .photo__veil { opacity: 0; }
+.page--finale .photo__reveal { transition: scale 18s cubic-bezier(0.3, 0, 0.2, 1); transition-delay: 0s; }
+.leaf.is-entered .page--finale .photo__reveal { scale: 1.12; }
+.leaf.is-entered .page--finale:is([data-scene="greeting"], [data-scene="message"], [data-scene="end"]) .photo__reveal { scale: 1; }
+
+/* Darkening: a scrim behind the greeting, an even veil behind the message. */
+.finale__scrim {
+  position: absolute; z-index: 2; left: 0; right: 0; bottom: 0; height: 64%; pointer-events: none;
+  background: linear-gradient(to top, rgba(10, 4, 6, 0.86), rgba(10, 4, 6, 0)); opacity: 0; transition: opacity 3s ease;
+}
+.page--finale[data-scene="greeting"] .finale__scrim { opacity: 1; transition-delay: 1.4s; }
+.finale__shade { position: absolute; z-index: 2; inset: 0; pointer-events: none; background-color: #0a0406; opacity: 0; transition: opacity 2.8s ease; }
+.page--finale:is([data-scene="message"], [data-scene="end"]) .finale__shade { opacity: 0.72; }
+
+/* "One last thing…" */
+.finale__lead {
+  position: absolute; z-index: 4; inset: 0; display: grid; place-items: center; padding: var(--m); text-align: center;
+  font-family: var(--serif); font-style: italic; font-weight: 300; font-size: clamp(1.4rem, 7.6cqw, 2.4rem); line-height: 1.25; color: var(--ivory);
+  opacity: 0; translate: 0 12px; transition: opacity 1.4s ease, translate 2.6s var(--ease-soft); pointer-events: none;
+}
+.page--finale[data-scene="lead"] .finale__lead { opacity: 1; translate: 0 0; }
+.page--finale:is([data-scene="greeting"], [data-scene="message"], [data-scene="end"]) .finale__lead { opacity: 0; translate: 0 -8px; }
+
+/* "Happy Birthday, NAME" */
+.finale__greet {
+  position: absolute; z-index: 4; left: 0; right: 0; bottom: calc(var(--m) * 1.7); padding-inline: var(--m);
+  display: grid; justify-items: center; gap: 0.35rem; text-align: center; pointer-events: none;
+  transition: opacity 1.6s ease;
+}
+.page--finale:is([data-scene="message"], [data-scene="end"]) .finale__greet { opacity: 0; }
+.finale__hb {
+  font-family: var(--serif); font-style: italic; font-weight: 300; font-size: clamp(1.1rem, 5.8cqw, 1.75rem); color: var(--gold-on-wine);
+  opacity: 0; translate: 0 8px; transition: opacity 1.8s ease, translate 2.4s var(--ease-soft);
+}
+.page--finale:is([data-scene="greeting"], [data-scene="message"], [data-scene="end"]) .finale__hb { opacity: 1; translate: none; }
+.page--finale[data-scene="greeting"] .finale__hb { transition-delay: 2.4s; }
+.finale__name {
+  max-width: 100%; margin: 0; font-family: var(--serif); font-weight: 300; line-height: 1.02; overflow-wrap: anywhere;
+  font-size: min(clamp(2.5rem, 17cqw, 5.4rem), calc((100cqw - var(--m) * 2.4) / (var(--chars, 6) * 0.5)));
+}
+.fn { display: inline-block; overflow: hidden; vertical-align: top; padding-bottom: 0.2em; margin-bottom: -0.2em; }
+.fn__in { display: inline-block; transform: translate3d(0, 115%, 0); transition: transform 2.4s var(--ease-soft); }
+.page--finale:is([data-scene="greeting"], [data-scene="message"], [data-scene="end"]) .fn__in { transform: none; }
+.page--finale[data-scene="greeting"] .fn__in { transition-delay: calc(3.1s + var(--wi, 0) * 0.22s); }
+
+/* The message. */
+.finale__scroll {
+  position: absolute; z-index: 5; inset: 0; display: flex; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain;
+  padding: calc(var(--m) * 1.8) calc(var(--m) * 1.15) calc(var(--m) * 2.4);
+  scrollbar-width: none; opacity: 0; visibility: hidden; touch-action: pan-y;
+  /* the first and last lines melt into the page instead of being cut off */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 7%, #000 92%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 7%, #000 92%, transparent 100%);
+  transition: opacity 1.8s ease, visibility 0s linear 1.8s;
+}
+.finale__scroll::-webkit-scrollbar { display: none; }
+.page--finale:is([data-scene="message"], [data-scene="end"]) .finale__scroll { opacity: 1; visibility: visible; transition: opacity 1.8s ease 1.3s, visibility 0s; }
+.finale__inner { width: 100%; max-width: 30rem; margin: auto; }
+.finale__p {
+  margin: 0 0 1.4em; font-family: var(--serif); font-weight: 400; font-size: clamp(1.05rem, 5cqw, 1.5rem); line-height: 1.62;
+  color: rgba(243, 237, 224, 0.95); text-shadow: 0 1px 14px rgba(0, 0, 0, 0.55);
+}
+.fs { opacity: 0; transition: opacity 2.2s ease; }
+.fs.is-in { opacity: 1; }
+.finale__end { display: grid; justify-items: center; gap: 1.1rem; margin-top: 2.4em; text-align: center; opacity: 0; transition: opacity 2.6s ease; }
+.finale__end.is-in { opacity: 1; }
+.finale__closing { margin: 0; font-family: var(--serif); font-style: italic; font-weight: 300; font-size: clamp(1.1rem, 5.6cqw, 1.65rem); line-height: 1.35; color: var(--gold-on-wine); }
+.finale__again {
+  min-height: 44px; margin-top: 0.4rem; padding: 0.5rem 0.2rem; border: 0; border-bottom: 1px solid rgba(184, 147, 90, 0.55); background: none; cursor: pointer;
+  font-family: var(--sans); font-size: 0.6875rem; font-weight: 500; letter-spacing: 0.24em; text-transform: uppercase; color: rgba(243, 237, 224, 0.62);
+  transition: color 0.3s ease, border-color 0.3s ease;
+}
+.finale__again:hover { color: var(--ivory); border-bottom-color: var(--gold); }
+
+/* On the finale the chrome steps back: the words and the photograph are all there is.
+   Only the contents dim — the bars keep their solid ground, so a page turning in never shows through. */
+.album[data-layout="finale"] .album__bar > *, .album[data-layout="finale"] .album__nav > * { opacity: 0.3; transition: opacity 2.4s ease 1s; }
+.album[data-layout="finale"] .album__bar:hover > *, .album[data-layout="finale"] .album__bar:focus-within > *,
+.album[data-layout="finale"] .album__nav:hover > *, .album[data-layout="finale"] .album__nav:focus-within > * { opacity: 1; transition-delay: 0s; }
+.album[data-layout="finale"] .fx-light { opacity: 0.22; }
+.album[data-layout="finale"] .fx-grain::before { opacity: 0.045; }
+.album[data-layout="finale"] .hotspot { pointer-events: none; }   /* the message scrolls; swipe, keys and buttons still turn the page */
 
 /* chapter: a wine divider -------------------------------------------- */
 .page--chapter { align-items: center; justify-content: center; text-align: center; gap: clamp(14px, 6cqw, 30px); }
@@ -957,7 +1046,7 @@ img { display: block; max-width: 100%; }
 }
 .leaf.is-entered .page--title::before, .leaf.is-entered .page--chapter::before { opacity: 1; scale: 1; }
 
-.page--closing::before, .page--reveal::before, .page--chapter::after {
+.page--closing::before, .page--chapter::after {
   content: ""; position: absolute; inset: 0; pointer-events: none;
   background: radial-gradient(62% 46% at 50% 44%, rgba(214, 170, 110, 0.3), rgba(214, 170, 110, 0) 72%);
   opacity: 0; scale: 0.82;
@@ -965,7 +1054,7 @@ img { display: block; max-width: 100%; }
   transition-delay: 500ms;
 }
 .page--chapter::after { background: radial-gradient(50% 36% at 50% 38%, rgba(214, 170, 110, 0.2), rgba(214, 170, 110, 0) 72%); }
-.leaf.is-entered .page--closing::before, .leaf.is-entered .page--reveal::before, .leaf.is-entered .page--chapter::after { opacity: 1; scale: 1.06; }
+.leaf.is-entered .page--closing::before, .leaf.is-entered .page--chapter::after { opacity: 1; scale: 1.06; }
 
 /* The sprig draws itself, then its leaves fill in. */
 .leaf.is-entered .sprig path {
@@ -1002,7 +1091,7 @@ img { display: block; max-width: 100%; }
 }
 @keyframes ripple { from { transform: scale(1); opacity: 0.7; } to { transform: scale(3.2); opacity: 0; } }
 
-.leaf.is-current.is-entered .page--closing::before, .leaf.is-current.is-entered .page--reveal::before { animation: glow 11s ease-in-out infinite alternate; animation-delay: 7.5s; }
+.leaf.is-current.is-entered .page--closing::before { animation: glow 11s ease-in-out infinite alternate; animation-delay: 7.5s; }
 @keyframes glow { from { opacity: 1; } to { opacity: 0.7; } }
 
 /* Paper: the page breathes against its binding, and settles when it lands. */
@@ -1107,10 +1196,19 @@ img { display: block; max-width: 100%; }
   scale: none !important; transition: none !important;
 }
 :root[data-reduced] .page--title::before, :root[data-reduced] .page--chapter::before { opacity: 1; scale: none; }
-:root[data-reduced] .page--closing::before, :root[data-reduced] .page--reveal::before, :root[data-reduced] .page--chapter::after { opacity: 1; scale: none; animation: none !important; }
+:root[data-reduced] .page--closing::before, :root[data-reduced] .page--chapter::after { opacity: 1; scale: none; animation: none !important; }
 :root[data-reduced] .leaf [data-fx="wipe"] { clip-path: none !important; }
 :root[data-reduced] .tl__line, :root[data-reduced] .tl__node { display: none; }
 :root[data-reduced] .slot { transition-duration: 1ms !important; }
 :root[data-reduced] .leaf *, :root[data-reduced] .leaf *::before, :root[data-reduced] .leaf *::after,
 :root[data-reduced] .fx-light__blob, :root[data-reduced] .leaf__face { animation: none !important; }
 :root[data-reduced] .photo__reveal { inset: 0; }
+
+/* The finale in reduced motion: the same beats, compressed, as plain fades. */
+:root[data-reduced] .page--finale *, :root[data-reduced] .finale__photo {
+  transition-duration: 0.7s !important; transition-delay: 0s !important; translate: none !important; scale: none !important;
+}
+:root[data-reduced] .page--finale .fn__in { transform: none !important; }
+:root[data-reduced] .page--finale .fn { overflow: visible; }
+:root[data-reduced] .page--finale .photo__veil { transition-duration: 1.4s !important; }
+:root[data-reduced] .album .album__bar > *, :root[data-reduced] .album .album__nav > * { transition-duration: 0.7s !important; }

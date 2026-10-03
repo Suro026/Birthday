@@ -458,6 +458,20 @@
     ],
   };
 
+  /** A message written in a template literal -> paragraphs. A blank line starts a new paragraph;
+      single line breaks and indentation are folded into ordinary flowing text. */
+  function messageParagraphs(message) {
+    return String(message || '').replace(/\r/g, '').split(/\n\s*\n/)
+      .map((p) => p.split('\n').map((line) => line.trim()).filter(Boolean).join(' '))
+      .filter(Boolean);
+  }
+
+  /** Splits a paragraph into sentences, keeping their punctuation. */
+  function sentencesOf(paragraph) {
+    const found = paragraph.match(/[^.!?…]+(?:[.!?…]+["”’')\]]*)?\s*/g);
+    return found ? found.map((s) => s.trim()).filter(Boolean) : [paragraph];
+  }
+
   const LAYOUTS = {
     /* 1 · Opening memory: one large print, taped down, with her name above and
        a handwritten line below. The picture is uncovered slowly. */
@@ -618,26 +632,60 @@
       return result('interactive', { heading: spec.heading }, el, slots.map((s) => s.img));
     },
 
-    /* 8 · Final reveal: from near darkness a single print slowly develops. */
-    reveal(spec, ctx) {
-      const mem = firstMemory(spec, { ratio: '4/5', rotation: -1.6, tape: 'top' });
-      const slot = printSlot(mem, ctx,
-        { frame: 'mat', kind: 'fade', reveal: 'develop', delay: 1800, time: 6500, depth: 4, sizes: '(min-width: 768px) 36vw, 64vw' },
-        { flow: true, tapeDelay: 7600, lift: 1.05 });
-      const el = h('div', { class: 'page page--reveal' }, [
-        words('h2', 'reveal__heading', spec.heading, 900, 2400),
-        h('div', { class: 'reveal__print' }, [slot.el]),
-        h('div', { class: 'reveal__foot' }, [
-          hand('p', 'reveal__line', spec.text || mem.caption, 8200, 2200),
-          spec.restartLabel
-            ? fx(h('button', { class: 'btn btn--onwine', type: 'button', dataset: { action: 'restart' } }, [
-                h('span', { text: spec.restartLabel }),
-              ]), 'fade', 10500, 2000)
-            : null,
+    /* 8 · The finale. One photograph, almost no ornament, and a slow sequence of scenes
+       (see createFinale): "One last thing…" -> the photograph develops with the greeting
+       -> the message, one sentence at a time -> a closing line. CSS decides what each
+       scene looks like; only the words and the photograph come from config.js. */
+    finale(spec, ctx) {
+      const name = ctx.cfg.recipient.name;
+      const mem = firstMemory(spec, { ratio: '3/4' });
+      const fig = photoFigure(mem, ctx,
+        { frame: 'bleed', reveal: 'develop', depth: 4, pointer: 8, sizes: '(min-width: 768px) 50vw, 100vw' });
+      fig.el.classList.add('finale__photo');
+
+      // The name rises out of a mask. --chars lets CSS shrink a long name to fit a narrow phone.
+      const parts = String(name || '').split(/\s+/).filter(Boolean);
+      const nameEl = h('h2', { class: 'finale__name' });
+      parts.forEach((word, i) => {
+        const mask = h('span', { class: 'fn' }, [h('span', { class: 'fn__in', text: word })]);
+        mask.style.setProperty('--wi', String(i));
+        nameEl.append(mask);
+        if (i < parts.length - 1) nameEl.append(' ');
+      });
+      nameEl.style.setProperty('--chars', String(Math.max(4, ...parts.map((w) => w.length))));
+
+      // The message: blank line = new paragraph; each sentence is revealed on its own.
+      const paragraphs = messageParagraphs(spec.message).map((p) => {
+        const para = h('p', { class: 'finale__p' });
+        const list = sentencesOf(p);
+        list.forEach((sentence, i) => {
+          const span = h('span', { class: 'fs', text: sentence, dataset: { w: String(sentence.split(/\s+/).length) } });
+          if (i === list.length - 1) span.dataset.end = '';
+          para.append(span, ' ');
+        });
+        return para;
+      });
+
+      const el = h('div', { class: 'page page--finale', dataset: { scene: 'idle', pace: String(Number(spec.pace) || 190) } }, [
+        fig.el,
+        h('span', { class: 'finale__shade', 'aria-hidden': 'true' }),
+        h('span', { class: 'finale__scrim', 'aria-hidden': 'true' }),
+        text('p', 'finale__lead', spec.lead),
+        h('div', { class: 'finale__greet' }, [text('p', 'finale__hb', spec.greeting), nameEl]),
+        h('div', { class: 'finale__scroll', tabindex: '0', role: 'region', 'aria-label': spec.messageLabel || 'Message' }, [
+          h('div', { class: 'finale__inner' }, [
+            ...paragraphs,
+            h('div', { class: 'finale__end' }, [
+              h('span', { class: 'rule', 'aria-hidden': 'true' }),
+              text('p', 'finale__closing', spec.closing),
+              spec.restartLabel
+                ? h('button', { class: 'finale__again', type: 'button', dataset: { action: 'restart' }, text: spec.restartLabel })
+                : null,
+            ]),
+          ]),
         ]),
-        memoSlip(),
       ]);
-      return result('reveal', { title: spec.heading, caption: mem.caption }, el, [slot.img], 'wine-deep');
+      return result('finale', { title: `${spec.greeting || ''} ${name || ''}`.trim() }, el, [fig.img], 'ink');
     },
 
     /* ---- simple typographic pages, kept for flexibility ---- */
@@ -895,15 +943,16 @@
       const atRest = L.p <= 0.0005 || L.p >= 0.9995;
       // From rest the page lifts gently; if it is already moving (released drag,
       // interrupted turn) it simply decelerates into place.
-      // The leaf that uncovers the closing page turns very slowly: the final reveal.
-      const slow = i === total - 2 && total > 2 ? 1.8 : 1;
+      // The leaf that uncovers the last page turns very slowly (the finale slower still): the final reveal.
+      const intoFinale = pages[total - 1] && pages[total - 1].layout === 'finale';
+      const slow = i === total - 2 && total > 2 ? (intoFinale ? 2.7 : 1.8) : 1;
       L.anim = {
         from: L.p,
         to,
         t0: now() + delay,
         dur: fxs.reduced
           ? 380
-          : Math.max(MIN_MS, (TURN_MS * slow * Math.pow(dist, 0.75)) / clamp(speed, 1, 2.4)),
+          : Math.max(MIN_MS, (TURN_MS * slow * Math.pow(dist, 0.75)) / (slow > 2 ? 1 : clamp(speed, 1, 2.4))),
         ease: atRest && !fxs.reduced ? easeInOut : easeOut,
       };
     }
@@ -1220,10 +1269,101 @@
     };
   }
 
+  /**
+   * Directs the finale page through its scenes. CSS defines what each scene looks like
+   * (the page's data-scene attribute); this only switches scene and, during the message,
+   * reveals one sentence at a time at a pace that follows reading speed.
+   *
+   *   idle -> lead ("One last thing…") -> greeting (photograph + "Happy Birthday, NAME")
+   *        -> message (sentence by sentence) -> end (closing line, "begin again")
+   *
+   * A tap moves things along (greeting -> message; message -> show it all). Touching or
+   * scrolling the message stops it following along, so it can be read at her own pace.
+   * With reduced motion the same beats play faster, as simple fades.
+   */
+  const FINALE = { lead: 1500, photo: 5200, message: 15000, firstSentence: 2400, skipSentence: 1600 };
+
+  function createFinale(page, fxs) {
+    const scroller = page.querySelector('.finale__scroll');
+    const sentences = [...page.querySelectorAll('.fs')];
+    const end = page.querySelector('.finale__end');
+    const pace = (Number(page.dataset.pace) || 190) * (fxs.reduced ? 0.5 : 1); // ms of reading time per word
+    let timers = [];
+    let scene = 'idle';
+    let userScrolled = false;
+
+    const later = (ms, fn) => { timers.push(setTimeout(fn, ms)); };
+    const clear = () => { timers.forEach(clearTimeout); timers = []; };
+    const setScene = (next) => { scene = next; page.dataset.scene = next; };
+
+    /** Keep the newest line comfortably in view, unless she has taken over the scrolling. */
+    function follow(node) {
+      if (userScrolled || !node) return;
+      const r = node.getBoundingClientRect();
+      const s = scroller.getBoundingClientRect();
+      const over = r.bottom - (s.bottom - s.height * 0.18);
+      if (over > 0) scroller.scrollBy({ top: over + s.height * 0.12, behavior: fxs.reduced ? 'auto' : 'smooth' });
+    }
+    function showSentence(node) { node.classList.add('is-in'); follow(node); }
+    function showEnd() { end.classList.add('is-in'); follow(end); setScene('end'); }
+
+    function scheduleMessage(from) {
+      let t = from;
+      sentences.forEach((node) => {
+        if (node.classList.contains('is-in')) return;
+        later(t, () => showSentence(node));
+        t += clamp(Number(node.dataset.w) * pace, 900, 3800) + (node.dataset.end !== undefined ? 1100 : 0);
+      });
+      later(t + 500, showEnd);
+    }
+
+    function toMessage(first) {
+      clear();
+      setScene('message');
+      scheduleMessage(first);
+    }
+
+    function advance() {
+      if (scene === 'greeting') toMessage(FINALE.skipSentence);
+      else if (scene === 'message') {
+        clear();
+        sentences.forEach((node) => node.classList.add('is-in'));
+        showEnd();
+      }
+    }
+
+    page.addEventListener('click', (e) => { if (!e.target.closest('button, a')) advance(); });
+    for (const type of ['touchstart', 'wheel', 'pointerdown']) {
+      scroller.addEventListener(type, () => { if (scene === 'message' || scene === 'end') userScrolled = true; }, { passive: true });
+    }
+
+    return {
+      start() {
+        clear();
+        userScrolled = false;
+        scroller.scrollTop = 0;
+        setScene('idle');
+        // Reduced motion keeps every beat but compresses the timing; the CSS turns movement into plain fades.
+        const k = fxs.reduced ? 0.45 : 1;
+        later(FINALE.lead * k, () => setScene('lead'));
+        later(FINALE.photo * k, () => setScene('greeting'));
+        later(FINALE.message * k, () => toMessage(FINALE.firstSentence * k));
+      },
+      stop() {
+        clear();
+        setScene('idle');
+        sentences.forEach((node) => node.classList.remove('is-in'));
+        end.classList.remove('is-in');
+        scroller.scrollTop = 0;
+      },
+    };
+  }
+
   function createMotion(album, dom, fxs) {
     const book = album.book;
     const leaves = book.leaves;
     const fields = new Map();   // leaf index -> field
+    const finales = new Map();  // leaf index -> finale director
     const active = new Set();
     let raf = 0;
     let last = 0;
@@ -1343,12 +1483,18 @@
         else el.style.removeProperty('--base');
         el.classList.add('is-entered');
         startScene(i);
+        if (el.dataset.layout === 'finale') {
+          let director = finales.get(i);
+          if (!director) { director = createFinale(el.querySelector('.page--finale'), fxs); finales.set(i, director); }
+          director.start();
+        }
       },
       leave(i) {
         const el = leaves[i].el;
         el.classList.remove('is-entered', 'is-instant', 'is-landed-a', 'is-landed-b');
         el.classList.add('is-reset'); // snap back to the hidden state without animating
         stopScene(i);
+        if (finales.has(i)) finales.get(i).stop();
       },
       land: flutter,
     };

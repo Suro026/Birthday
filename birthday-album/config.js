@@ -7,17 +7,37 @@
    Dates are ISO strings ("YYYY-MM-DD") and are formatted automatically.
    A non-ISO value such as "Summer 2022" is shown exactly as written.
    ========================================================================== */
+
+/* ==========================================================================
+   START HERE — her name, and the message that closes the album.
+   --------------------------------------------------------------------------
+   A blank line starts a new paragraph. Line breaks and indentation inside a
+   paragraph are ignored, so write it however is comfortable. On the last page
+   each sentence appears on its own, a moment after the one before.
+   ========================================================================== */
+const birthdayConfig = {
+  name: 'Anaya',
+  finalMessage: `
+    MY MESSAGE HERE.
+
+    Write it in your own words. A blank line starts a new paragraph, and every
+    sentence will appear on its own, a moment after the last one.
+
+    Keep it as short or as long as you like.
+  `,
+};
+
 window.ALBUM_CONFIG = {
 
   /* Browser tab title and <html lang>. */
   site: {
-    title: 'For Anaya — A Book of Memories',
+    title: `For ${birthdayConfig.name} — A Book of Memories`,
     language: 'en',
   },
 
   /* Her name, as it appears on the cover and the title page. */
   recipient: {
-    name: 'Anaya',
+    name: birthdayConfig.name,
   },
 
   /* Her birthday. Shown on the title page when its showDate is true. */
@@ -51,7 +71,7 @@ window.ALBUM_CONFIG = {
        timeline     moments set along a gold line         photos[4]
        polaroids    instant prints with written borders   photos[4]
        interactive  a loose pile — tap one to bring it forward  photos[6]
-       reveal       the final page: a print slowly develops  photo
+       finale       the last page: one photograph, a slow reveal, your message  photo, message
        (also: title, chapter, note, closing — simple typographic pages)
 
      A photograph ("memory") is:
@@ -74,7 +94,6 @@ window.ALBUM_CONFIG = {
     /* 1 · Opening memory */
     { layout: 'opening',
       eyebrow: 'It began here',
-      title: 'Anaya',
       photo: {
         image: '/assets/photos/photo-01.webp', ratio: '4/5', focus: '50% 40%',
         caption: 'the first photograph of us', date: '2023-02-14',
@@ -151,13 +170,16 @@ window.ALBUM_CONFIG = {
         { image: '/assets/photos/photo-22.webp', caption: 'little moment six',   date: '2024-06-08', description: 'Placeholder description.' },
       ] },
 
-    /* 8 · Final reveal */
-    { layout: 'reveal',
-      heading: 'Happy Birthday',
-      text: 'Placeholder closing line.',
-      restartLabel: 'Back to the beginning',
-      photo: { image: '/assets/photos/photo-23.webp', ratio: '4/5', caption: 'this one is for you', date: '2024-06-09',
-        description: 'Placeholder description for the final photograph.' } },
+    /* 8 · The finale — one strong photograph, then your message (edit it at the top of this file) */
+    { layout: 'finale',
+      lead: 'One last thing...',
+      greeting: 'Happy Birthday,',          // her name follows, from birthdayConfig.name
+      message: birthdayConfig.finalMessage,
+      closing: "Here's to another beautiful chapter.",
+      restartLabel: 'Begin again',
+      pace: 190,                            // milliseconds of reading time allowed per word
+      photo: { image: '/assets/photos/photo-23.webp', ratio: '3/4', focus: '50% 35%',
+        alt: 'The last photograph' } },
   ],
 
   /* Background music.
