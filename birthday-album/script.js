@@ -124,11 +124,12 @@
     cover: { eyebrow: '', lead: '', button: 'Open the album', hint: '' },
     base: { photos: 'assets/photos/', music: 'assets/music/' },
     pages: [],
-    music: { src: '', title: '', volume: 0.6, loop: true },
+    music: { src: '', title: '', volume: 0.6, loop: true, fadeMs: 1200 },
     motion: { quality: 'auto' },
     ui: {
       previous: 'Previous', next: 'Next', close: 'Close album',
-      soundOff: 'Turn sound off', soundOn: 'Turn sound on',
+      play: 'Play', pause: 'Pause', mute: 'Mute', unmute: 'Unmute',
+      playMusic: 'Play music', pauseMusic: 'Pause music', muteMusic: 'Mute music', unmuteMusic: 'Unmute music',
       page: 'Page', of: 'of', photograph: 'Photograph',
     },
   };
@@ -148,7 +149,8 @@
       return false;
     });
     if (!cfg.pages.length) cfg.pages = [{ layout: 'title' }];
-    cfg.music.volume = clamp(Number(cfg.music.volume) || 0, 0, 1);
+    cfg.music.volume = clamp(Number.isFinite(Number(cfg.music.volume)) ? Number(cfg.music.volume) : 0.6, 0, 1);
+    cfg.music.fadeMs = clamp(Number(cfg.music.fadeMs) || 0, 0, 5000);
     if (!cfg.recipient.name) console.warn('[album] recipient.name is empty.');
     return cfg;
   }
@@ -1666,50 +1668,164 @@
 
   /* ------------------------------------------------------------------------
      9. Music
+        One <audio> for the whole album session.
+          - Nothing is requested or played until "Open the album" is pressed:
+            the element is only created inside that click, so browsers' autoplay
+            rules are respected and a visitor who never opens the album never
+            downloads the track.
+          - It keeps playing while pages turn (it is never recreated or restarted).
+          - Play/pause and mute are separate; both choices are remembered for the
+            session (sessionStorage), together with the playback position, so a
+            reload picks up where it left off — still only after Open is pressed.
+          - It pauses (without losing its place) when the album is closed back to
+            the cover or the tab is hidden, and resumes unless she paused it herself.
+          - If the file is missing or cannot be decoded the controls simply
+            disappear and everything else carries on.
+        state: idle -> loading -> playing | paused | error   (data-state on #music)
      ------------------------------------------------------------------------ */
-  function initMusic(cfg, album, button) {
+  function createMusic(cfg, album, dom) {
     const src = resolveAsset(cfg.music.src, cfg.base.music);
-    if (!src) return;
+    const box = dom.music;
+    if (!src || !box) return null;
+
+    const KEY = 'album:music';
+    const store = {
+      read() { try { return JSON.parse(sessionStorage.getItem(KEY)) || {}; } catch { return {}; } },
+      write(v) { try { sessionStorage.setItem(KEY, JSON.stringify(v)); } catch { /* storage unavailable */ } },
+    };
+    const saved = store.read();
 
     let audio = null;
-    let wanted = true; // flips when she mutes it herself
+    let failed = false;
+    let userPaused = Boolean(saved.paused);   // she pressed Pause (survives close/reload)
+    let muted = Boolean(saved.muted);
+    let resumeAt = Number(saved.t) > 0 ? Number(saved.t) : 0;
+    let state = 'idle';
+    let fade = 0;
+    let lastSave = 0;
 
-    const paint = () => {
-      const playing = wanted && album.view === 'album';
-      button.setAttribute('aria-pressed', String(wanted));
-      const label = wanted ? cfg.ui.soundOff : cfg.ui.soundOn;
-      button.setAttribute('aria-label', label);
-      button.title = cfg.music.title ? `${cfg.music.title} — ${label}` : label;
-      return playing;
-    };
+    const persist = () => store.write({ paused: userPaused, muted, t: audio ? Math.floor(audio.currentTime * 10) / 10 : resumeAt });
+    const shouldPlay = () => album.view === 'album' && !userPaused && !document.hidden && !failed;
 
-    const sync = () => {
-      const playing = paint();
-      if (!audio) return;
-      if (playing) audio.play().catch(() => {}); else audio.pause();
-    };
+    /* ---- the two words ---- */
+    function paint() {
+      const playing = state === 'playing' || state === 'loading';
+      box.dataset.state = state;
+      dom.musicToggleLabel.textContent = playing ? cfg.ui.pause : cfg.ui.play;
+      dom.musicToggle.setAttribute('aria-label', playing ? cfg.ui.pauseMusic : cfg.ui.playMusic);
+      dom.musicToggle.title = cfg.music.title || '';
+      dom.musicMuteLabel.textContent = muted ? cfg.ui.unmute : cfg.ui.mute;
+      dom.musicMute.setAttribute('aria-label', muted ? cfg.ui.unmuteMusic : cfg.ui.muteMusic);
+      dom.musicMute.setAttribute('aria-pressed', String(muted));
+    }
+    function setState(next) { state = next; paint(); }
 
-    const ensureAudio = () => {
-      if (audio) return;
-      audio = new Audio(src);
-      audio.loop = Boolean(cfg.music.loop);
-      audio.volume = cfg.music.volume;
+    /* ---- volume: a soft fade in/out (iOS ignores volume; mute still works) ---- */
+    function fadeTo(target, done) {
+      clearInterval(fade);
+      const ms = cfg.music.fadeMs;
+      if (!audio || !ms || fxsReduced()) { if (audio) audio.volume = target; if (done) done(); return; }
+      const from = audio.volume;
+      const t0 = now();
+      fade = setInterval(() => {
+        const k = clamp((now() - t0) / ms, 0, 1);
+        try { audio.volume = from + (target - from) * k; } catch { /* read-only volume */ }
+        if (k >= 1) { clearInterval(fade); if (done) done(); }
+      }, 40);
+    }
+    const fxsReduced = () => document.documentElement.hasAttribute('data-reduced');
+
+    /* ---- the element ---- */
+    function fail(reason) {
+      if (failed) return;
+      failed = true;
+      console.warn(`[album] Music unavailable (${reason}):`, src);
+      clearInterval(fade);
+      state = 'error';
+      box.hidden = true;
+      box.dataset.state = 'error';
+      if (audio) { try { audio.pause(); } catch { /* ignore */ } }
+    }
+
+    function ensureAudio() {
+      if (audio || failed) return;
+      audio = new Audio();
       audio.preload = 'auto';
-      audio.addEventListener('error', () => {
-        console.warn('[album] Could not load music:', src);
-        button.hidden = true;
-        audio = null;
-        wanted = false;
+      audio.loop = Boolean(cfg.music.loop);
+      audio.volume = 0;
+      audio.muted = muted;
+      audio.addEventListener('error', () => fail(audio && audio.error ? `code ${audio.error.code}` : 'error'));
+      audio.addEventListener('loadedmetadata', () => {
+        if (resumeAt > 0 && resumeAt < audio.duration - 1) audio.currentTime = resumeAt;
+        resumeAt = 0;
+      }, { once: true });
+      audio.addEventListener('playing', () => setState('playing'));
+      audio.addEventListener('waiting', () => { if (!audio.paused) setState('loading'); });
+      audio.addEventListener('pause', () => { if (state !== 'error') setState('paused'); });
+      audio.addEventListener('ended', () => { if (!audio.loop) setState('paused'); });
+      audio.addEventListener('timeupdate', () => {
+        const t = now();
+        if (t - lastSave > 2000) { lastSave = t; persist(); }
       });
-    };
+      audio.src = src;
+    }
 
-    button.hidden = false;
-    paint();
-    button.addEventListener('click', () => { wanted = !wanted; ensureAudio(); sync(); });
-    album.on('view', ({ view }) => {
-      if (view === 'album') ensureAudio();
+    function play() {
+      ensureAudio();
+      if (!audio || failed) return;
+      setState('loading');
+      const result = audio.play();
+      if (result && result.then) {
+        result.then(() => fadeTo(cfg.music.volume)).catch((err) => {
+          // Blocked by the browser's autoplay rules, or interrupted by a pause: stay quiet and wait for a tap.
+          if (err && (err.name === 'NotSupportedError')) fail('not supported');
+          else if (!failed) setState('paused');
+        });
+      }
+    }
+
+    function pauseSoftly() {
+      if (!audio || audio.paused) { if (state !== 'error') setState('paused'); return; }
+      // A hidden tab throttles timers, so stop at once there instead of fading.
+      if (document.hidden) { clearInterval(fade); audio.pause(); return; }
+      fadeTo(0, () => { if (!shouldPlay()) audio.pause(); });
+    }
+
+    function sync() {
+      if (failed) return;
+      if (shouldPlay()) play(); else pauseSoftly();
+    }
+
+    /* ---- controls ---- */
+    dom.musicToggle.addEventListener('click', () => {
+      userPaused = !(userPaused);
+      persist();
       sync();
+      paint();
     });
+    dom.musicMute.addEventListener('click', () => {
+      muted = !muted;
+      if (audio) audio.muted = muted;
+      persist();
+      paint();
+    });
+
+    /* ---- follow the album ---- */
+    album.on('view', ({ view }) => {
+      if (view === 'album') box.hidden = failed;
+      sync();
+      persist();
+    });
+    document.addEventListener('visibilitychange', () => { if (album.view === 'album') sync(); persist(); });
+    window.addEventListener('pagehide', persist);
+
+    paint();
+    return {
+      get audio() { return audio; },
+      get state() { return state; },
+      get muted() { return muted; },
+      get userPaused() { return userPaused; },
+    };
   }
 
   /* ------------------------------------------------------------------------
@@ -1746,6 +1862,11 @@
       counterCurrent: $('#counter-current'),
       counterTotal: $('#counter-total'),
       status: $('#status'),
+      music: $('#music'),
+      musicToggle: $('#music-toggle'),
+      musicToggleLabel: $('#music-toggle-label'),
+      musicMute: $('#music-mute'),
+      musicMuteLabel: $('#music-mute-label'),
     };
 
     const fxs = createSettings(cfg);
@@ -1770,7 +1891,7 @@
     initKeyboard(album);
     initGestures(album, dom);
     initPointerClass();
-    initMusic(cfg, album, $('#sound-btn'));
+    album.music = createMusic(cfg, album, dom);
 
     // Exposed for the console and for later experiments.
     window.album = album;

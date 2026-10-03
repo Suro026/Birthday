@@ -49,14 +49,18 @@
     <header class="album__bar">
       <p class="album__title" id="album-title"></p>
 
-      <div class="album__tools">
-        <button class="icon-btn" id="sound-btn" type="button" aria-pressed="false" hidden>
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/>
-            <path class="icon-wave" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/>
-            <path class="icon-slash" d="M16 9.5l5 5M21 9.5l-5 5"/>
-          </svg>
+      <!-- Background music: two quiet words, not a media player. Hidden unless a track is configured
+           (and hidden again if the file cannot be loaded). -->
+      <div class="music" id="music" data-state="idle" hidden>
+        <button class="music__btn" id="music-toggle" type="button">
+          <span class="music__note" aria-hidden="true">&#9834;</span><span class="music__label" id="music-toggle-label">Music</span>
         </button>
+        <button class="music__btn music__btn--mute" id="music-mute" type="button" aria-pressed="false">
+          <span class="music__label" id="music-mute-label">Mute</span>
+        </button>
+      </div>
+
+      <div class="album__tools">
         <button class="icon-btn" id="close-btn" type="button">
           <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path d="M6 6l12 12M18 6L6 18"/>

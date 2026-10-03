@@ -160,14 +160,19 @@ window.ALBUM_CONFIG = {
         description: 'Placeholder description for the final photograph.' } },
   ],
 
-  /* Background music. Leave src empty for a silent album.
-     The sound button only appears when a file is configured.
-     Browsers only allow audio after a tap, so it starts when she opens the album. */
+  /* Background music.
+     The track is only requested, and only starts, when she presses "Open the album"
+     (browsers do not allow music before a tap). It keeps playing as pages turn,
+     and she can pause or mute it from the two small words in the header.
+     If the file is missing the music controls simply stay hidden.
+     Use a recording you have the rights to — an original, a licence-free track or a
+     song you own. Save it as assets/music/birthday-song.mp3 (about 2–4 MB, 128 kbps is plenty). */
   music: {
-    src: '',            // e.g. 'our-song.mp3' (placed in assets/music/)
-    title: '',          // shown as the sound button's tooltip
-    volume: 0.6,        // 0 – 1
+    src: '/assets/music/birthday-song.mp3',
+    title: '',          // optional, shown as a tooltip on the control
+    volume: 0.5,        // 0 – 1 (iOS ignores this; master the file quieter instead)
     loop: true,
+    fadeMs: 1200,       // soft fade in on start/resume and out on pause (0 = none)
   },
 
   /* Interface text, in case you want to translate it. */
@@ -175,8 +180,14 @@ window.ALBUM_CONFIG = {
     previous: 'Previous',
     next: 'Next',
     close: 'Close album',
-    soundOff: 'Turn sound off',
-    soundOn: 'Turn sound on',
+    play: 'Play',
+    pause: 'Pause',
+    mute: 'Mute',
+    unmute: 'Unmute',
+    playMusic: 'Play music',
+    pauseMusic: 'Pause music',
+    muteMusic: 'Mute music',
+    unmuteMusic: 'Unmute music',
     page: 'Page',
     of: 'of',
     photograph: 'Photograph',

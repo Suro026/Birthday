@@ -33,7 +33,19 @@ caption, date and description. Tap again, tap elsewhere, press Esc or turn the p
 - Optional `full: '/assets/photos/photo-01-2400.webp'` is fetched only when that photograph is tapped.
 - Batch-convert: `for f in *.jpg; do cwebp -q 78 -resize 1200 0 "$f" -o "${f%.jpg}.webp"; done` (or use Squoosh / ImageMagick).
 
-- Put a track in `assets/music/` and set `music.src`. It starts when she taps "Open the album".
+### Music
+Save a track as **`assets/music/birthday-song.mp3`** (the path is `music.src` in `config.js`; use a recording you have the
+rights to — an original, a licence-free track, or a song you own; 128 kbps / 2–4 MB is plenty).
+
+- It is **not requested or played until she presses "Open the album"** — browsers forbid music before a tap, and a visitor
+  who never opens the album downloads nothing.
+- One audio element for the whole session: turning pages never restarts it. Closing the album back to the cover, or
+  switching tabs, pauses it and re-opening continues from the same second (unless she paused it herself).
+- Two quiet words in the header: **♪ Pause / Play** and **Mute / Unmute**. Both choices (and the position) are remembered
+  for the session, so a reload keeps them — and still waits for Open before any sound.
+- `music.volume` (0–1) and `music.fadeMs` (soft fade in/out) are configurable. iOS ignores `volume`; master the file
+  quieter if it is too loud on iPhones.
+- If the file is missing or can't be decoded, the music words stay hidden and the rest of the album works normally.
 - `motion: { quality: 'auto' | 'full' | 'lite' | 'off' }` — `off` behaves like reduced-motion.
 
 ## Run locally
