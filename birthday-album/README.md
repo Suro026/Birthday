@@ -1,68 +1,81 @@
-# Birthday Album
+# A private birthday album
 
-A cinematic photo album / memory book. Plain HTML + CSS + vanilla JS — no build step, no dependencies.
+A hand-made digital photo album: ivory paper, burgundy cloth, a little gold. Plain HTML, CSS and JavaScript — no build step,
+no framework, no libraries (the only outside request is Google Fonts).
 
-## Customise
-Edit **`config.js`** only: her name, birthday, cover text, music, UI text and the `pages` list. Each page picks a
-`layout`: `opening`, `collage`, `full`, `list`, `timeline`, `polaroids`, `interactive`, `reveal` (plus the simple
-`title`, `chapter`, `note`, `closing`).
+## Files
 
-### Photographs
-Every photograph is a small object — the same shape on every layout:
-
-```js
-{ image: '/assets/photos/photo-01.webp',   // "/assets/…" works from any folder / sub-path
-  ratio: '4/5',                             // shape of the print (prevents layout jumps)
-  caption: 'the first photograph of us',    // handwritten
-  date: '2023-02-14',                       // or free text
-  description: 'Shown on the paper slip when the photograph is tapped.',
-  focus: '50% 40%',                         // keep faces in frame
-  position: { x: 12, y: 5, w: 52 },         // % of the page: left, top, width
-  rotation: -2.2,                           // degrees — small numbers look like real prints
-  tape: 'top' }                             // 'top' | 'corner' | 'both' | ''
 ```
-Every layout has good defaults, so `position`, `rotation` and `tape` are optional. A missing file shows a placeholder plate.
+birthday-album/
+├── index.html        the page shell (cover, album frame, music words)
+├── config.js         ← THE ONLY FILE YOU EDIT: her name, the message, every photo, caption, date, the music
+├── style.css         the design
+├── script.js         the behaviour (page turn, gestures, motion, music, finale)
+├── README.md
+└── assets/
+    ├── photos/       ← your photographs go here
+    ├── music/        ← your song goes here
+    └── textures/     (optional, empty)
+```
 
-**Tap a photograph** → it lifts slightly (on the interactive page it comes to the middle) and a paper slip shows its
-caption, date and description. Tap again, tap elsewhere, press Esc or turn the page to put it back.
+## Where to put things
 
-### Keeping it light
-- Only the page being read, and its neighbours, are downloaded; images are `decoding="async"` and prioritised.
-- Export photos as WebP at about **1200px on the long edge** (≈100–200 KB). For phones add smaller versions and a
-  `srcset`: `srcset: '/assets/photos/photo-01-640.webp 640w, /assets/photos/photo-01.webp 1200w'`.
-- Optional `full: '/assets/photos/photo-01-2400.webp'` is fetched only when that photograph is tapped.
-- Batch-convert: `for f in *.jpg; do cwebp -q 78 -resize 1200 0 "$f" -o "${f%.jpg}.webp"; done` (or use Squoosh / ImageMagick).
+| What | Where |
+| --- | --- |
+| **Her name** | `config.js` → top of the file → `birthdayConfig.name` |
+| **The birthday message** | `config.js` → top of the file → `birthdayConfig.finalMessage` (between the backticks). A blank line starts a new paragraph; each sentence is revealed on its own. |
+| **Photographs** | `assets/photos/` — named `photo-01.webp` … `photo-23.webp` (or use any names and change them in `config.js`) |
+| **Captions, dates, descriptions** | `config.js` → `pages: [ … ]` — each photo has `caption`, `date`, `description` |
+| **The song** | `assets/music/birthday-song.mp3` |
+| **Closing line, "One last thing…", button labels** | `config.js` → the last entry of `pages` (`layout: 'finale'`) |
+
+Which photo is where (all in `config.js`, in this order):
+
+| Page | Layout | Photos |
+| --- | --- | --- |
+| 1 | Opening memory | `photo-01` |
+| 2 | Collage | `photo-02` … `photo-06` |
+| 3 | Full-screen photograph | `photo-07` |
+| 4 | "Little things I love about you" | `photo-08` (optional small print, shown on larger screens) |
+| 5 | Timeline | `photo-09` … `photo-12` |
+| 6 | Polaroids | `photo-13` … `photo-16` |
+| 7 | Proof sheet (tap a frame) | `photo-17` … `photo-22` |
+| 8 | Finale | `photo-23` — **choose the strongest photograph you have** |
+
+A missing photo shows a quiet placeholder, so you can add them gradually. (Your browser's developer console will list a
+"404" for each missing file — that disappears once the files are in place.)
+
+### Photograph format
+Export as **WebP, about 1200 px on the long edge** (≈100–200 KB each). Only the page being read and its neighbours are
+downloaded. Optional extras per photo: `srcset` (smaller versions for phones), `full` (a larger file fetched only when
+the photo is tapped), `focus` (`"50% 30%"` keeps faces in frame), `position`, `rotation`, `tape`. Batch-convert:
+`for f in *.jpg; do cwebp -q 78 -resize 1200 0 "$f" -o "${f%.jpg}.webp"; done`
 
 ### Music
-Save a track as **`assets/music/birthday-song.mp3`** (the path is `music.src` in `config.js`; use a recording you have the
-rights to — an original, a licence-free track, or a song you own; 128 kbps / 2–4 MB is plenty).
+Save the track as `assets/music/birthday-song.mp3` (128 kbps, 2–4 MB). Use a recording you have the rights to.
 
-- It is **not requested or played until she presses "Open the album"** — browsers forbid music before a tap, and a visitor
-  who never opens the album downloads nothing.
-- One audio element for the whole session: turning pages never restarts it. Closing the album back to the cover, or
-  switching tabs, pauses it and re-opening continues from the same second (unless she paused it herself).
+- Nothing is requested or played until she presses **Open the album** (browsers don't allow music before a tap).
+- It plays through the whole album without restarting. Closing the album or switching tabs pauses it; reopening continues.
 - Two quiet words in the header: **♪ Pause / Play** and **Mute / Unmute**. Both choices (and the position) are remembered
-  for the session, so a reload keeps them — and still waits for Open before any sound.
-- `music.volume` (0–1) and `music.fadeMs` (soft fade in/out) are configurable. iOS ignores `volume`; master the file
-  quieter if it is too loud on iPhones.
-- If the file is missing or can't be decoded, the music words stay hidden and the rest of the album works normally.
-- `motion: { quality: 'auto' | 'full' | 'lite' | 'off' }` — `off` behaves like reduced-motion.
+  for the session.
+- `music.volume` (0–1) and `music.fadeMs` are in `config.js`. iPhones ignore volume — master the file quieter if needed.
+- If the file is missing the music words stay hidden and everything else works.
 
-## Run locally
-Open `index.html`, or serve the folder: `python3 -m http.server`.
-
-## Deploy
-Serve this folder as a static site (set it as the root/publish directory on Vercel, Netlify or GitHub Pages).
+### Motion
+`motion: { quality: 'auto' | 'full' | 'lite' | 'off' }` in `config.js`. `auto` follows the device (phones get lighter
+motion) and honours the system "reduce motion" setting, which turns movement into plain fades. `off` forces that.
 
 ## Controls
-Swipe or mouse-drag a page · click/tap a page edge · ← → · PageUp/PageDown · Home/End · trackpad two-finger scroll · Esc (back to the cover) · `#3` in the URL opens page 3.
+Swipe or drag a page · click or tap a page edge · ← → · PageUp/PageDown · Home/End · Esc (back to the cover) · tap a
+photograph for its caption · `#3` in the URL opens page 3.
+
+## Run and deploy
+Open `index.html`, or serve the folder (`python3 -m http.server`). To deploy, publish **this folder** as a static site
+(Vercel, Netlify, GitHub Pages). If it lives inside a larger repository, set the site's root/publish directory to
+`birthday-album`. The page is marked `noindex` so search engines leave it alone.
 
 ## Code map (`script.js`)
-Utilities → Config → Page layouts → Image loading → Book engine → Album controller → Input → Music → Boot.
-
-## How the page turn works
-Each page is a leaf hinged on its left edge with a progress `p` (0 flat, 1 turned). Per frame the engine writes only
-`transform` and `opacity` (leaf rotation, shade, cast shadow, photo parallax) — no layout, filters or animated shadows.
-Dragging sets `p` from the finger; buttons/keys/taps/releases tween it, so interrupted or overlapping turns just work.
-Only the visible leaves are rendered. Add `data-depth` / `data-zoom` to any element in a page for parallax.
-Hooks: `album.on('change' | 'view')`, `album.book.leaves[i].p`, `--mx/--my`, `.fine-pointer`.
+Utilities → Configuration (+ motion settings) → Page layouts → Image loading → Book engine → Album controller →
+Motion → Memories (tap a photo) → Input → Music → Boot. The page turn writes only `transform` and `opacity`
+(see the comment at the top of the file). Other layouts available in `config.js` if you want to rearrange the book:
+`title`, `chapter`, `note`, `closing`.
